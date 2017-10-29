@@ -40,8 +40,6 @@ namespace rFactor2StatsBuilder
         throw ex;
       }
 
-      
-
       foreach (var masFileFull in Directory.GetFiles(vehFullPath, "*.mas", SearchOption.AllDirectories))
       {
         Utils.WriteLine($"Processing .mas: {masFileFull}", ConsoleColor.Cyan);
