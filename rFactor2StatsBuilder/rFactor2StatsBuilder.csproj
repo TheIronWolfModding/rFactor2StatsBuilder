@@ -46,6 +46,7 @@
     <Compile Include="Program.cs" />
     <Compile Include="Properties\AssemblyInfo.cs" />
     <Compile Include="SourceExtractor.cs" />
+    <Compile Include="StatsBuilder.cs" />
     <Compile Include="Utils.cs" />
   </ItemGroup>
   <ItemGroup>

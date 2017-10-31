@@ -21,20 +21,8 @@ namespace rFactor2StatsBuilder
 
     static void Main(string[] args)
     {
-      try
-      {
-        if (Directory.Exists(rFactor2StatsBuilder.OutRoot))
-        {
-          Console.WriteLine("Deleting old out root.");
-          Directory.Delete(rFactor2StatsBuilder.OutRoot, true /*recursive*/);
-        }
-      }
-      catch (Exception ex)
-      {
-        Utils.ReportException($"Failed to delete old out root {rFactor2StatsBuilder.OutRoot}", ex);
-      }
-
-      SourceExtractor.Extract();
+      //SourceExtractor.Extract();
+      StatsBuilder.Build();
     }
   }
 }
