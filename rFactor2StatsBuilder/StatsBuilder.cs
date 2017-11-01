@@ -33,9 +33,33 @@ namespace rFactor2StatsBuilder
       {
         Utils.WriteLine($"\nProcessing .veh: {vehFileFull}", ConsoleColor.Cyan);
 
-//        var vehFileReader = new IniFile(vehFileFull);
+        var vehFileReader = new KindOfSortOfIniFile(vehFileFull);
 
-  //      var descr = vehFileReader.Read("Description", "GENERAL");
+        Dictionary<string, string> section;
+        if (!vehFileReader.sectionsToKeysToValuesMap.TryGetValue("", out section))
+        {
+          Utils.WriteLine($"Error: global section not found in file {vehFileFull}.", ConsoleColor.Red);
+          continue;
+        }
+
+        string descr;
+        if (!section.TryGetValue("Description", out descr))
+        {
+          Utils.WriteLine($"Error: 'Description' key value not found in file {vehFileFull}.", ConsoleColor.Red);
+          continue;
+        }
+
+        string cat;
+        if (!section.TryGetValue("Category", out cat))
+        {
+          Utils.WriteLine($"Error: 'Description' key value not found in file {vehFileFull}.", ConsoleColor.Red);
+          continue;
+        }
+
+        var vehId = $"{descr}@@{cat}".ToLowerInvariant();
+        Utils.WriteLine(vehId);
+
+        //      var descr = vehFileReader.Read("Description", "GENERAL");
 
 
       }
