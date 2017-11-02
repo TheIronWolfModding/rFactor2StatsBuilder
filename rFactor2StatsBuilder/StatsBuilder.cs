@@ -21,7 +21,6 @@ namespace rFactor2StatsBuilder
       foreach (var vehDirFull in Directory.GetDirectories(rFactor2StatsBuilder.OutRoot))
       {
         var vehDir = new DirectoryInfo(vehDirFull).Name;
-
         StatsBuilder.ProcessSingleVehicle(vehDirFull, vehDir);
       }
     }
@@ -31,55 +30,93 @@ namespace rFactor2StatsBuilder
       Utils.WriteLine($"\nProcessing vehicle: {vehDir}", ConsoleColor.Green);
       foreach (var vehFileFull in Directory.GetFiles(vehDirFull, "*.veh", SearchOption.AllDirectories))
       {
-        Utils.WriteLine($"\nProcessing .veh: {vehFileFull}", ConsoleColor.Cyan);
-
-        var vehFileReader = new KindOfSortOfIniFile(vehFileFull);
-
-        Dictionary<string, string> section;
-        if (!vehFileReader.sectionsToKeysToValuesMap.TryGetValue("", out section))
+        string hdvFile;
+        var vehEntry = StatsBuilder.ProcessVehFile(vehFileFull, vehDir, out hdvFile);
+        if (vehEntry == null || string.IsNullOrWhiteSpace(hdvFile))
         {
-          Utils.WriteLine($"Error: global section not found in file {vehFileFull}.", ConsoleColor.Red);
+          Utils.WriteLine($"Error: failed to process vehicle {vehFileFull}.", ConsoleColor.Red);
           continue;
         }
 
-        string descr;
-        if (!section.TryGetValue("Description", out descr))
-        {
-          Utils.WriteLine($"Error: 'Description' key value not found in file {vehFileFull}.", ConsoleColor.Red);
-          continue;
-        }
-
-        string cat;
-        if (!section.TryGetValue("Category", out cat))
-        {
-          Utils.WriteLine($"Error: 'Category' key value not found in file {vehFileFull}.", ConsoleColor.Red);
-          continue;
-        }
-
-        var catExtracted = StatsBuilder.ExtractCategory(cat);
-        if (string.IsNullOrWhiteSpace(catExtracted))
-        {
-          Utils.WriteLine($"Error: Failed to parse categroy out of {cat} in {vehFileFull}.", ConsoleColor.Red);
-          continue;
-        }
-
-        var descrExtracted = StatsBuilder.UnquoteString(descr);
-        if (string.IsNullOrWhiteSpace(descrExtracted))
-        {
-          Utils.WriteLine($"Error: Failed to parse description out of {descr} in {vehFileFull}.", ConsoleColor.Red);
-          continue;
-        }
-
-        var vehId = $"{descrExtracted}@@{catExtracted}".ToLowerInvariant();
-        Utils.WriteLine(vehId);
-
-        //      var descr = vehFileReader.Read("Description", "GENERAL");
-
+        Utils.WriteLine($"VEH entry created: {vehEntry.VehID},{vehEntry.Version},{vehEntry.HdvID}", ConsoleColor.Magenta);
 
       }
-
     }
 
+    private static VehEntry ProcessVehFile(string vehFileFull, string vehDir, out string hdvFile)
+    {
+      hdvFile = "";
+
+      Utils.WriteLine($"\nProcessing .veh: {vehFileFull}", ConsoleColor.Cyan);
+      
+      var vehFileReader = new KindOfSortOfIniFile(vehFileFull);
+
+      Dictionary<string, string> section;
+      if (!vehFileReader.sectionsToKeysToValuesMap.TryGetValue("", out section))
+      {
+        Utils.WriteLine($"Error: global section not found in file {vehFileFull}.", ConsoleColor.Red);
+        return null;
+      }
+
+      string descr;
+      if (!StatsBuilder.GetSectionValue(vehFileFull, section, "Description", out descr))
+        return null;
+
+      string cat;
+      if (!StatsBuilder.GetSectionValue(vehFileFull, section, "Category", out cat))
+        return null;
+
+      var catExtracted = StatsBuilder.ExtractCategory(cat);
+      if (string.IsNullOrWhiteSpace(catExtracted))
+      {
+        Utils.WriteLine($"Error: Failed to parse categroy out of {cat} in {vehFileFull}.", ConsoleColor.Red);
+        return null;
+      }
+
+      var descrExtracted = StatsBuilder.UnquoteString(descr);
+      if (string.IsNullOrWhiteSpace(descrExtracted))
+      {
+        Utils.WriteLine($"Error: Failed to parse description out of {descr} in {vehFileFull}.", ConsoleColor.Red);
+        return null;
+      }
+
+      string hdvFileFull;
+      if (!StatsBuilder.GetSectionValue(vehFileFull, section, "HDVehicle", out hdvFileFull))
+        return null;
+
+      var lastSlash = hdvFileFull.LastIndexOf('\\');
+      hdvFile = hdvFileFull;
+      if (lastSlash != -1)
+        hdvFile = hdvFileFull.Substring(lastSlash + 1);
+
+      if (string.IsNullOrWhiteSpace(hdvFile))
+      {
+        Utils.WriteLine($"Error: Failed to parse .hdv file name out of {hdvFileFull} in {vehFileFull}.", ConsoleColor.Red);
+        return null;
+      }
+
+      // veh_1
+      var vehID = $"{descrExtracted}@@{catExtracted}".ToLowerInvariant();
+
+      // veh_2
+      var ver = new DirectoryInfo(vehFileFull).Parent.Name;
+
+      // veh_3
+      var hdvID = $"hdv@@{vehDir}@@{ver}@@{hdvFile}".ToLowerInvariant();
+
+      return new VehEntry() { VehID = vehID, Version = ver, HdvID = hdvID };
+    } 
+
+    private static bool GetSectionValue(string vehFileFull, Dictionary<string, string> section, string key, out string value)
+    {
+      if (!section.TryGetValue(key, out value))
+      {
+        Utils.WriteLine($"Error: '{key}' key value not found in file {vehFileFull}.", ConsoleColor.Red);
+        return false;
+      }
+
+      return true;
+    }
     private static string UnquoteString(string str)
     {
       if (!str.StartsWith("\"") || !str.EndsWith("\"") || str.Length < 3)
