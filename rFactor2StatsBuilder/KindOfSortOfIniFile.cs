@@ -66,7 +66,7 @@ namespace rFactor2StatsBuilder
           var keyValue = l.Split('=');
           if (keyValue.Length == 0 || keyValue.Length > 2)
           {
-            this.ReportError($"unrecognized key value pair statement {l}", fileFull, lineCounter);
+            this.ReportWarning($"ignoring unrecognized key value pair statement {l}.  Authoring error really, please fix.", fileFull, lineCounter);
             continue;
           }
 
