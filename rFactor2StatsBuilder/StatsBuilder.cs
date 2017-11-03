@@ -40,7 +40,7 @@ namespace rFactor2StatsBuilder
 
         Utils.WriteLine($"VEH entry created: {vehEntry.VehID},{vehEntry.Version},{vehEntry.HdvID}", ConsoleColor.Magenta);
 
-
+        var hdvEntry = StatsBuilder.ProcessHdvFile(hdvFile, vehDirFull, vehDir, vehEntry.Version, vehEntry.HdvID, vehFileFull);
 
       }
     }
@@ -50,7 +50,7 @@ namespace rFactor2StatsBuilder
       hdvFile = "";
 
       Utils.WriteLine($"\nProcessing .veh: {vehFileFull}", ConsoleColor.Cyan);
-      
+
       var vehFileReader = new KindOfSortOfIniFile(vehFileFull);
 
       Dictionary<string, string> section;
@@ -109,10 +109,27 @@ namespace rFactor2StatsBuilder
       return new VehEntry() { VehID = vehID, Version = ver, HdvID = hdvID };
     }
 
-    private static HdvEntry ProcessHdvFile(string hdvFile, string vehDir, string vehVer)
-    {
-      return null;
+    private static Dictionary<string, HdvEntry> hdvResolvedMap = new Dictionary<string, HdvEntry>();
 
+    private static HdvEntry ProcessHdvFile(string hdvFile, string vehDirFull, string vehDir, string vehVer, string hdvId, string vehFileFull)
+    {
+      var hdvFiles = Directory.GetFiles(vehDirFull, hdvFile, SearchOption.AllDirectories);
+      if (hdvFiles == null || hdvFiles.Length == 0)
+      {
+        Utils.WriteLine($"Error: failed to locate {hdvFile} for vehicle {vehFileFull}.", ConsoleColor.Red);
+        return null;
+      }
+      else if (hdvFiles.Length > 1)
+        Utils.WriteLine($"Warning: hdv file {hdvFile} is ambigous for vehicle {vehFileFull}.  Will use the first one: {hdvFiles[0]}. ", ConsoleColor.Yellow);
+
+      var hdvFileFull = hdvFiles[0];
+      HdvEntry hdvEntry = null;
+      if (StatsBuilder.hdvResolvedMap.TryGetValue(hdvFileFull, out hdvEntry))
+        return hdvEntry;
+
+      Utils.WriteLine($"\nProcessing .hdv: {hdvFileFull}", ConsoleColor.Cyan);
+
+      return null;
     }
 
     private static bool GetSectionValue(string vehFileFull, Dictionary<string, string> section, string key, out string value)
