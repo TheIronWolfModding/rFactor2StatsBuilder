@@ -18,4 +18,11 @@ namespace rFactor2StatsBuilder
     internal string Version { get; set; }
     internal string HdvID { get; set; }
   }
+
+  internal class HdvEntry
+  {
+    internal string HdvID { get; set; }
+    internal string StaticCurve { get; set; }
+    internal string[] TbcIDs { get; set; }
+  }
 }

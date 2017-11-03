@@ -40,6 +40,8 @@ namespace rFactor2StatsBuilder
 
         Utils.WriteLine($"VEH entry created: {vehEntry.VehID},{vehEntry.Version},{vehEntry.HdvID}", ConsoleColor.Magenta);
 
+
+
       }
     }
 
@@ -105,7 +107,13 @@ namespace rFactor2StatsBuilder
       var hdvID = $"hdv@@{vehDir}@@{ver}@@{hdvFile}".ToLowerInvariant();
 
       return new VehEntry() { VehID = vehID, Version = ver, HdvID = hdvID };
-    } 
+    }
+
+    private static HdvEntry ProcessHdvFile(string hdvFile, string vehDir, string vehVer)
+    {
+      return null;
+
+    }
 
     private static bool GetSectionValue(string vehFileFull, Dictionary<string, string> section, string key, out string value)
     {
