@@ -50,7 +50,7 @@ namespace rFactor2StatsBuilder
             continue;
           }
 
-          var sectionName = l.Substring(1, closingBkgIdx);
+          var sectionName = l.Substring(1, closingBkgIdx - 1);
 
           // Ok, this is new section.  Create a new section:
           currentSection = new Dictionary<string, string>();
@@ -60,19 +60,29 @@ namespace rFactor2StatsBuilder
         }
         else  // Key=value.
         {
-          // TODO: deal with 
-          // Sponsor = "civic_btcc_1EXTRA7.dds" SponsorTexStage = 3
           l = this.SanitizeKeyValuePair(l);
-          var keyValue = l.Split('=');
-          if (keyValue.Length == 0 || keyValue.Length > 2)
+          if (!l.Contains("="))
           {
-            this.ReportWarning($"ignoring unrecognized key value pair statement {l}.  Authoring error really, please fix.", fileFull, lineCounter);
+            this.ReportWarning($"ignoring unrecognized key value pair statement \"{l}\".", fileFull, lineCounter);
             continue;
           }
 
+          var keyValue = l.Split('=');
+
+          // Drop Special keys (not needed yet, need special parsing).
+          if (keyValue[0].EndsWith("Special"))
+            continue;
+
+          if (keyValue.Length == 0 || keyValue.Length > 2)
+          {
+            this.ReportWarning($"ignoring unrecognized key value pair statement \"{l}\".", fileFull, lineCounter);
+            continue;
+          }
+
+
           if (currentSection.ContainsKey(keyValue[0]))
           {
-            this.ReportWarning($"already encountered {keyValue[0]}", fileFull, lineCounter);
+            this.ReportWarning($"already encountered \"{keyValue[0]}\"", fileFull, lineCounter);
             continue;
           }
 

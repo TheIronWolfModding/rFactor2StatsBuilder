@@ -38,7 +38,7 @@ namespace rFactor2StatsBuilder
           continue;
         }
 
-        Utils.WriteLine($"VEH entry created: {vehEntry.VehID},{vehEntry.Version},{vehEntry.HdvID}", ConsoleColor.Magenta);
+        Utils.WriteLine($"VEH entry created: \"{vehEntry.VehID},{vehEntry.Version},{vehEntry.HdvID}\"", ConsoleColor.Magenta);
 
         var hdvEntry = StatsBuilder.ProcessHdvFile(hdvFile, vehDirFull, vehDir, vehEntry.Version, vehEntry.HdvID, vehFileFull);
 
@@ -127,7 +127,34 @@ namespace rFactor2StatsBuilder
       if (StatsBuilder.hdvResolvedMap.TryGetValue(hdvFileFull, out hdvEntry))
         return hdvEntry;
 
-      Utils.WriteLine($"\nProcessing .hdv: {hdvFileFull}", ConsoleColor.Cyan);
+      do
+      {
+        /*
+         * Extracted stuff:
+         * [GENERAL]
+         * TireBrand=
+         *  
+         *  
+         */
+        Utils.WriteLine($"\nProcessing .hdv: {hdvFileFull}", ConsoleColor.Cyan);
+
+        var hdvFileReader = new KindOfSortOfIniFile(hdvFileFull);
+
+        Dictionary<string, string> section;
+        if (!hdvFileReader.sectionsToKeysToValuesMap.TryGetValue("GENERAL", out section))
+        {
+          Utils.WriteLine($"Error: [GENERAL] section not found in file {hdvFileFull}.", ConsoleColor.Red);
+          break;
+        }
+
+        string tireBrand = null;
+        if (!StatsBuilder.GetSectionValue(hdvFileFull, section, "TireBrand", out tireBrand))
+          break;
+
+      }
+      while (false);
+
+      StatsBuilder.hdvResolvedMap.Add(hdvFileFull, hdvEntry);
 
       return null;
     }
