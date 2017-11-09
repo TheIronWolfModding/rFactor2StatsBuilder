@@ -31,7 +31,7 @@ namespace rFactor2StatsBuilder
       Utils.WriteLine($"\nProcessing vehicle: {vehDir}", ConsoleColor.Green);
       foreach (var vehFileFull in Directory.GetFiles(vehDirFull, "*.veh", SearchOption.AllDirectories))
       {
-        string hdvFile;
+        string hdvFile = null;
         var vehEntry = StatsBuilder.ProcessVehFile(vehFileFull, vehDir, out hdvFile);
         if (vehEntry == null || string.IsNullOrWhiteSpace(hdvFile))
         {
@@ -41,8 +41,13 @@ namespace rFactor2StatsBuilder
 
         Utils.WriteLine($"VEH entry created: \"{vehEntry.VehID},{vehEntry.Version},{vehEntry.HdvID}\"", ConsoleColor.Magenta);
 
-        var hdvEntry = StatsBuilder.ProcessHdvFile(hdvFile, vehDirFull, vehDir, vehEntry.Version, vehEntry.HdvID, vehFileFull);
-
+        string hdvFileFull = null;
+        var hdvEntry = StatsBuilder.ProcessHdvFile(hdvFile, vehDirFull, vehDir, vehEntry.Version, vehEntry.HdvID, vehFileFull, out hdvFileFull);
+        if (hdvEntry == null || string.IsNullOrWhiteSpace(hdvEntry.TireBrand))
+        {
+          Utils.WriteLine($"Error: failed to process hdv file {hdvFileFull ?? ""} for vehicle {vehFileFull}.", ConsoleColor.Red);
+          continue;
+        }
       }
     }
 
@@ -112,8 +117,9 @@ namespace rFactor2StatsBuilder
 
     private static Dictionary<string, HdvEntry> hdvResolvedMap = new Dictionary<string, HdvEntry>();
 
-    private static HdvEntry ProcessHdvFile(string hdvFile, string vehDirFull, string vehDir, string vehVer, string hdvId, string vehFileFull)
+    private static HdvEntry ProcessHdvFile(string hdvFile, string vehDirFull, string vehDir, string vehVer, string hdvId, string vehFileFull, out string hdvFileFull)
     {
+      hdvFileFull = null;
       var hdvFiles = Directory.GetFiles(vehDirFull, hdvFile, SearchOption.AllDirectories);
       if (hdvFiles == null || hdvFiles.Length == 0)
       {
@@ -123,7 +129,7 @@ namespace rFactor2StatsBuilder
       else if (hdvFiles.Length > 1)
         Utils.WriteLine($"Warning: hdv file {hdvFile} is ambigous for vehicle {vehFileFull}.  Will use the first one: {hdvFiles[0]}. ", ConsoleColor.Yellow);
 
-      var hdvFileFull = hdvFiles[0];
+      hdvFileFull = hdvFiles[0];
       HdvEntry hdvEntry = null;
       if (StatsBuilder.hdvResolvedMap.TryGetValue(hdvFileFull, out hdvEntry))
         return hdvEntry;
@@ -239,28 +245,96 @@ namespace rFactor2StatsBuilder
           break;
         }
 
+        // TODO:  Probably drop this as it isn't critical and kills TCR mod.
+        string vehicleWidth = null;
+        if (!StatsBuilder.GetSectionValue(hdvFileFull, section, "VehicleWidth", out vehicleWidth, false /*optional*/))
+          break;
 
+        //////////////////////////////////////////
+        // [FRONTLEFT] section.
+        //////////////////////////////////////////
+        if (!hdvFileReader.sectionsToKeysToValuesMap.TryGetValue("FRONTLEFT", out section))
+        {
+          Utils.WriteLine($"Error: [FRONTLEFT] section not found in file {hdvFileFull}.", ConsoleColor.Red);
+          break;
+        }
 
+        string frontLeftBrakeCurve = null;
+        if (!StatsBuilder.GetSectionValue(hdvFileFull, section, "BrakeResponseCurve", out frontLeftBrakeCurve, false /*optional*/))
+          break;
 
-        /*
-         * [BODYAERO]
-         * VehicleWidth= exact width
-         *    Opportunities: suggest adjusting BrakeDuctOpening, RadiatorOpening
-         *    
-         * [FRONTLEFT] // ZF SACHS Race Engineering Dampers FBT23 (front) and FBT24 (rear)
-         * [FRONTRIGHT]
-         * [REARLEFT]
-         * [REARRIGHT]
-         * BrakeResponseCurve=(-160,350,600,1590) // Cold temperature (where brake torque is half optimum), min temp for optimum brake torque, max temp for optimum brake torque, and overheated temperature (where brake torque is half optimum)
-         */
+        if (!StatsBuilder.RemoveParens(frontLeftBrakeCurve, out frontLeftBrakeCurve))
+          break;
 
+        //////////////////////////////////////////
+        // [FRONTRIGHT] section.
+        //////////////////////////////////////////
+        if (!hdvFileReader.sectionsToKeysToValuesMap.TryGetValue("FRONTRIGHT", out section))
+        {
+          Utils.WriteLine($"Error: [FRONTRIGHT] section not found in file {hdvFileFull}.", ConsoleColor.Red);
+          break;
+        }
 
+        string frontRightBrakeCurve = null;
+        if (!StatsBuilder.GetSectionValue(hdvFileFull, section, "BrakeResponseCurve", out frontRightBrakeCurve, false /*optional*/))
+          break;
+
+        if (!StatsBuilder.RemoveParens(frontRightBrakeCurve, out frontRightBrakeCurve))
+          break;
+
+        //////////////////////////////////////////
+        // [REARLEFT] section.
+        //////////////////////////////////////////
+        if (!hdvFileReader.sectionsToKeysToValuesMap.TryGetValue("REARLEFT", out section))
+        {
+          Utils.WriteLine($"Error: [REARLEFT] section not found in file {hdvFileFull}.", ConsoleColor.Red);
+          break;
+        }
+
+        string rearLeftBrakeCurve = null;
+        if (!StatsBuilder.GetSectionValue(hdvFileFull, section, "BrakeResponseCurve", out rearLeftBrakeCurve, false /*optional*/))
+          break;
+
+        if (!StatsBuilder.RemoveParens(rearLeftBrakeCurve, out rearLeftBrakeCurve))
+          break;
+
+        //////////////////////////////////////////
+        // [REARRIGHT] section.
+        //////////////////////////////////////////
+        if (!hdvFileReader.sectionsToKeysToValuesMap.TryGetValue("REARRIGHT", out section))
+        {
+          Utils.WriteLine($"Error: [REARRIGHT] section not found in file {hdvFileFull}.", ConsoleColor.Red);
+          break;
+        }
+
+        string rearRightBrakeCurve = null;
+        if (!StatsBuilder.GetSectionValue(hdvFileFull, section, "BrakeResponseCurve", out rearRightBrakeCurve, false /*optional*/))
+          break;
+
+        if (!StatsBuilder.RemoveParens(rearRightBrakeCurve, out rearRightBrakeCurve))
+          break;
+
+        hdvEntry = new HdvEntry()
+        {
+          HdvID = hdvId,
+          StopGo = stopGo,
+          StopGoSimultaneous = stopGoSimultaneous,
+          Preparation = preparation,
+          DRSCapable = DRSCapable,
+          VehicleWidth = vehicleWidth,
+          BrackeResponseCurveFrontLeft = frontLeftBrakeCurve,
+          BrackeResponseCurveFrontRight = frontRightBrakeCurve,
+          BrackeResponseCurveRearLeft = rearLeftBrakeCurve,
+          BrackeResponseCurveRearRight = rearRightBrakeCurve,
+          TbcIDPrefix = $"tbc@@{vehDir}@@{vehVer}@@{tireBrand}@@".ToLowerInvariant(),  // NOTE: simplication - using vehVer, so is ignoring the fact that multiple .tbc's are possible.
+          TireBrand = tireBrand
+        };
       }
       while (false);
 
       StatsBuilder.hdvResolvedMap.Add(hdvFileFull, hdvEntry);
 
-      return null;
+      return hdvEntry;
     }
 
     private static bool RemoveParens(string preparation, out string preparationOut)
