@@ -79,14 +79,15 @@ namespace rFactor2StatsBuilder
             continue;
           }
 
-
-          if (currentSection.ContainsKey(keyValue[0]))
+          var keyTrimmed = keyValue[0].Trim();
+          if (currentSection.ContainsKey(keyTrimmed))
           {
-            this.ReportWarning($"already encountered \"{keyValue[0]}\"", fileFull, lineCounter);
+            this.ReportWarning($"already encountered \"{keyTrimmed}\"", fileFull, lineCounter);
             continue;
           }
 
-          currentSection.Add(keyValue[0], keyValue[1]);
+          var valueTrimmed = keyValue[1];
+          currentSection.Add(keyTrimmed, valueTrimmed);
           continue;
         }
       }
@@ -98,7 +99,7 @@ namespace rFactor2StatsBuilder
       if (commentIdx != -1)
         return keyValue.Substring(0, commentIdx).TrimEnd();
 
-      return keyValue;
+      return keyValue.Trim();
     }
 
     private void ReportError(string msg, string fileFull, int line)

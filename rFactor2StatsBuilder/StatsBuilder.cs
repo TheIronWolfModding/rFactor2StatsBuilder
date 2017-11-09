@@ -6,6 +6,7 @@ Website: thecrewchief.org
 
 using System;
 using System.Collections.Generic;
+using System.Diagnostics;
 using System.IO;
 using System.Linq;
 using System.Text;
@@ -61,11 +62,11 @@ namespace rFactor2StatsBuilder
       }
 
       string descr;
-      if (!StatsBuilder.GetSectionValue(vehFileFull, section, "Description", out descr))
+      if (!StatsBuilder.GetSectionValue(vehFileFull, section, "Description", out descr, false /*optional*/))
         return null;
 
       string cat;
-      if (!StatsBuilder.GetSectionValue(vehFileFull, section, "Category", out cat))
+      if (!StatsBuilder.GetSectionValue(vehFileFull, section, "Category", out cat, false /*optional*/))
         return null;
 
       var catExtracted = StatsBuilder.ExtractCategory(cat);
@@ -83,7 +84,7 @@ namespace rFactor2StatsBuilder
       }
 
       string hdvFileFull;
-      if (!StatsBuilder.GetSectionValue(vehFileFull, section, "HDVehicle", out hdvFileFull))
+      if (!StatsBuilder.GetSectionValue(vehFileFull, section, "HDVehicle", out hdvFileFull, false /*optional*/))
         return null;
 
       var lastSlash = hdvFileFull.LastIndexOf('\\');
@@ -133,13 +134,45 @@ namespace rFactor2StatsBuilder
          * Extracted stuff:
          * [GENERAL]
          * TireBrand=
-         *  
-         *  
+         * 
+         * [PITMENU]
+         * StopGo=1                     // Whether stop/go pit menu item is available (highly recommended); default=1
+         *    - Penalty announcement tweak.
+         * 
+         * StopGoSimultaneous=0         // Whether stop/go penalties can be served during a regular pit stop (time is added at end); default=0
+         * Preparation=(150,24,0.5,4.5) // When crew gives up after request, crew prep time, delay multiplier for how much more time was needed to prep, max delay; default=(150,25,0.5,4.5)
+         *
+         *    Opportunities:
+         *      There are bunch of options for voice command (menu items).
+          *      Tire/Fuel pit time estimation
+         *
+         * [PLUGIN]
+         *      Opportunities: sensors, what is available?
+         *
+         * [REARWING]
+         * FlapDrag=(3.2e-4,0.94888)
+         * FlapLift=(-0.01,0.90319)
+         * FlapTimes=(0.04,0.08,0.04,0.3)
+         * FlapRules=(-1,0.0081)
+         * 
+         * [BODYAERO]
+         * VehicleWidth= exact width
+         *    Opportunities: suggest adjusting BrakeDuctOpening, RadiatorOpening
+         *    
+         * [FRONTLEFT] // ZF SACHS Race Engineering Dampers FBT23 (front) and FBT24 (rear)
+         * [FRONTRIGHT]
+         * [REARLEFT]
+         * [REARRIGHT]
+         * BrakeResponseCurve=(-160,350,600,1590) // Cold temperature (where brake torque is half optimum), min temp for optimum brake torque, max temp for optimum brake torque, and overheated temperature (where brake torque is half optimum)
          */
+
         Utils.WriteLine($"\nProcessing .hdv: {hdvFileFull}", ConsoleColor.Cyan);
 
         var hdvFileReader = new KindOfSortOfIniFile(hdvFileFull);
 
+        //////////////////////////////////////////
+        // [GENERAL] section.
+        //////////////////////////////////////////
         Dictionary<string, string> section;
         if (!hdvFileReader.sectionsToKeysToValuesMap.TryGetValue("GENERAL", out section))
         {
@@ -148,8 +181,79 @@ namespace rFactor2StatsBuilder
         }
 
         string tireBrand = null;
-        if (!StatsBuilder.GetSectionValue(hdvFileFull, section, "TireBrand", out tireBrand))
+        if (!StatsBuilder.GetSectionValue(hdvFileFull, section, "TireBrand", out tireBrand, false /*optional*/))
           break;
+
+        tireBrand = tireBrand.ToLowerInvariant();
+
+        // Some mods add .tbc, chop it off.
+        if (tireBrand.EndsWith(".tbc"))
+          tireBrand = tireBrand.Substring(0, tireBrand.Length - 4);
+
+        //////////////////////////////////////////
+        // [PITMENU] section.
+        //////////////////////////////////////////
+        if (!hdvFileReader.sectionsToKeysToValuesMap.TryGetValue("PITMENU", out section))
+        {
+          Utils.WriteLine($"Error: [PITMENU] section not found in file {hdvFileFull}.", ConsoleColor.Red);
+          break;
+        }
+
+        var stopGo = "1";
+        StatsBuilder.GetSectionValue(hdvFileFull, section, "StopGo", out stopGo, true /*optional*/);
+
+        var stopGoSimultaneous = "0";
+        StatsBuilder.GetSectionValue(hdvFileFull, section, "StopGoSimultaneous", out stopGoSimultaneous, true /*optional*/);
+
+        string preparation = null;
+        if (!StatsBuilder.GetSectionValue(hdvFileFull, section, "Preparation", out preparation, false /*optional*/))
+          break;
+
+        if (!StatsBuilder.RemoveParens(preparation, out preparation))
+          break;
+
+        //////////////////////////////////////////
+        // [REARWING] section.
+        //////////////////////////////////////////
+        if (!hdvFileReader.sectionsToKeysToValuesMap.TryGetValue("REARWING", out section))
+        {
+          Utils.WriteLine($"Error: [REARWING] section not found in file {hdvFileFull}.", ConsoleColor.Red);
+          break;
+        }
+
+        string DRSCapable = null;
+        if (StatsBuilder.GetSectionValue(hdvFileFull, section, "FlapDrag", out DRSCapable, true /*optional*/)
+          && StatsBuilder.GetSectionValue(hdvFileFull, section, "FlapLift", out DRSCapable, true /*optional*/)
+          && StatsBuilder.GetSectionValue(hdvFileFull, section, "FlapTimes", out DRSCapable, true /*optional*/)
+          && StatsBuilder.GetSectionValue(hdvFileFull, section, "FlapRules", out DRSCapable, true /*optional*/))
+          DRSCapable = "1";
+        else
+          DRSCapable = "0";
+
+        //////////////////////////////////////////
+        // [BODYAERO] section.
+        //////////////////////////////////////////
+        if (!hdvFileReader.sectionsToKeysToValuesMap.TryGetValue("BODYAERO", out section))
+        {
+          Utils.WriteLine($"Error: [BODYAERO] section not found in file {hdvFileFull}.", ConsoleColor.Red);
+          break;
+        }
+
+
+
+
+        /*
+         * [BODYAERO]
+         * VehicleWidth= exact width
+         *    Opportunities: suggest adjusting BrakeDuctOpening, RadiatorOpening
+         *    
+         * [FRONTLEFT] // ZF SACHS Race Engineering Dampers FBT23 (front) and FBT24 (rear)
+         * [FRONTRIGHT]
+         * [REARLEFT]
+         * [REARRIGHT]
+         * BrakeResponseCurve=(-160,350,600,1590) // Cold temperature (where brake torque is half optimum), min temp for optimum brake torque, max temp for optimum brake torque, and overheated temperature (where brake torque is half optimum)
+         */
+
 
       }
       while (false);
@@ -159,11 +263,24 @@ namespace rFactor2StatsBuilder
       return null;
     }
 
-    private static bool GetSectionValue(string vehFileFull, Dictionary<string, string> section, string key, out string value)
+    private static bool RemoveParens(string preparation, out string preparationOut)
+    {
+      if (!string.IsNullOrWhiteSpace(preparation) && preparation.StartsWith("(") && preparation.EndsWith(")"))
+      {
+        preparationOut = preparation.Substring(1, preparation.Length - 2);
+        return true;
+      }
+      preparationOut = preparation;
+      return false;
+    }
+
+    private static bool GetSectionValue(string vehFileFull, Dictionary<string, string> section, string key, out string value, bool optional)
     {
       if (!section.TryGetValue(key, out value))
       {
-        Utils.WriteLine($"Error: '{key}' key value not found in file {vehFileFull}.", ConsoleColor.Red);
+        if (!optional)
+          Utils.WriteLine($"Error: '{key}' key value not found in file {vehFileFull}.", ConsoleColor.Red);
+
         return false;
       }
 
