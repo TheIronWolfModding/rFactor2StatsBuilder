@@ -22,15 +22,16 @@ namespace rFactor2StatsBuilder
   internal class HdvEntry
   {
     internal string HdvID { get; set; }
+    internal string Version { get; set; }
     internal string StopGo { get; set; }
     internal string StopGoSimultaneous { get; set; }
     internal string Preparation { get; set; }
     internal string DRSCapable { get; set; }
     internal string VehicleWidth { get; set; }
-    internal string BrackeResponseCurveFrontLeft { get; set; }
-    internal string BrackeResponseCurveFrontRight { get; set; }
-    internal string BrackeResponseCurveRearLeft { get; set; }
-    internal string BrackeResponseCurveRearRight { get; set; }
+    internal string BrakeResponseCurveFrontLeft { get; set; }
+    internal string BrakeResponseCurveFrontRight { get; set; }
+    internal string BrakeResponseCurveRearLeft { get; set; }
+    internal string BrakeResponseCurveRearRight { get; set; }
     internal string TbcIDPrefix { get; set; }
 
     // Internal (not part of entries).

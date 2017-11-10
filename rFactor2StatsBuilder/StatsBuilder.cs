@@ -39,15 +39,19 @@ namespace rFactor2StatsBuilder
           continue;
         }
 
-        Utils.WriteLine($"VEH entry created: \"{vehEntry.VehID},{vehEntry.Version},{vehEntry.HdvID}\"", ConsoleColor.Magenta);
+        var vehEntryStr = $"{vehEntry.VehID},{vehEntry.Version},{vehEntry.HdvID}";
+        Utils.WriteLine($"VEH entry created: \"{vehEntryStr}\"", ConsoleColor.Magenta);
 
         string hdvFileFull = null;
-        var hdvEntry = StatsBuilder.ProcessHdvFile(hdvFile, vehDirFull, vehDir, vehEntry.Version, vehEntry.HdvID, vehFileFull, out hdvFileFull);
+        var hdvEntry = StatsBuilder.ProcessHdvFile(hdvFile, vehDirFull, vehDir, vehEntry.HdvID, vehFileFull, out hdvFileFull);
         if (hdvEntry == null || string.IsNullOrWhiteSpace(hdvEntry.TireBrand))
         {
           Utils.WriteLine($"Error: failed to process hdv file {hdvFileFull ?? ""} for vehicle {vehFileFull}.", ConsoleColor.Red);
           continue;
         }
+
+        var hdvEntryStr = $"{hdvEntry.HdvID},{hdvEntry.Version},{hdvEntry.StopGo},{hdvEntry.StopGoSimultaneous},{hdvEntry.Preparation},{hdvEntry.DRSCapable},{hdvEntry.VehicleWidth},{hdvEntry.BrakeResponseCurveFrontLeft},{hdvEntry.BrakeResponseCurveFrontRight},{hdvEntry.BrakeResponseCurveRearLeft},{hdvEntry.BrakeResponseCurveRearRight},{hdvEntry.TbcIDPrefix}";
+        Utils.WriteLine($"VEH entry matched: \"{hdvEntryStr}\"", ConsoleColor.Magenta);
       }
     }
 
@@ -110,14 +114,14 @@ namespace rFactor2StatsBuilder
       var ver = new DirectoryInfo(vehFileFull).Parent.Name;
 
       // veh_3
-      var hdvID = $"hdv@@{vehDir}@@{ver}@@{hdvFile}".ToLowerInvariant();
+      var hdvID = $"hdv@@{vehDir}@@{hdvFile}".ToLowerInvariant();
 
       return new VehEntry() { VehID = vehID, Version = ver, HdvID = hdvID };
     }
 
     private static Dictionary<string, HdvEntry> hdvResolvedMap = new Dictionary<string, HdvEntry>();
 
-    private static HdvEntry ProcessHdvFile(string hdvFile, string vehDirFull, string vehDir, string vehVer, string hdvId, string vehFileFull, out string hdvFileFull)
+    private static HdvEntry ProcessHdvFile(string hdvFile, string vehDirFull, string vehDir, string hdvId, string vehFileFull, out string hdvFileFull)
     {
       hdvFileFull = null;
       var hdvFiles = Directory.GetFiles(vehDirFull, hdvFile, SearchOption.AllDirectories);
@@ -314,19 +318,22 @@ namespace rFactor2StatsBuilder
         if (!StatsBuilder.RemoveParens(rearRightBrakeCurve, out rearRightBrakeCurve))
           break;
 
+        var ver = new DirectoryInfo(hdvFileFull).Parent.Name;
+
         hdvEntry = new HdvEntry()
         {
           HdvID = hdvId,
+          Version = ver,
           StopGo = stopGo,
           StopGoSimultaneous = stopGoSimultaneous,
           Preparation = preparation,
           DRSCapable = DRSCapable,
           VehicleWidth = vehicleWidth,
-          BrackeResponseCurveFrontLeft = frontLeftBrakeCurve,
-          BrackeResponseCurveFrontRight = frontRightBrakeCurve,
-          BrackeResponseCurveRearLeft = rearLeftBrakeCurve,
-          BrackeResponseCurveRearRight = rearRightBrakeCurve,
-          TbcIDPrefix = $"tbc@@{vehDir}@@{vehVer}@@{tireBrand}@@".ToLowerInvariant(),  // NOTE: simplication - using vehVer, so is ignoring the fact that multiple .tbc's are possible.
+          BrakeResponseCurveFrontLeft = frontLeftBrakeCurve,
+          BrakeResponseCurveFrontRight = frontRightBrakeCurve,
+          BrakeResponseCurveRearLeft = rearLeftBrakeCurve,
+          BrakeResponseCurveRearRight = rearRightBrakeCurve,
+          TbcIDPrefix = $"tbc@@{vehDir}@@{tireBrand}@@".ToLowerInvariant(),
           TireBrand = tireBrand
         };
       }
