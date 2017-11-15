@@ -62,7 +62,7 @@ namespace rFactor2StatsBuilder
         {
           Utils.WriteLine($"\nProcessing .mas: {masFileFull}", ConsoleColor.Cyan);
 
-          var psi = new ProcessStartInfo(rFactor2StatsBuilder.ModMgr, $"*.veh *.tbc *.hdv -x\"{masFileFull}\" -o\"{vehOutDirFull}\"");
+          var psi = new ProcessStartInfo(rFactor2StatsBuilder.ModMgr, $"*.veh *.tbc *.hdv *.tgm -x\"{masFileFull}\" -o\"{vehOutDirFull}\"");
           var process = new Process() { StartInfo = psi };
 
           process.Start();

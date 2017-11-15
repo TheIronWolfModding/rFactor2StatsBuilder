@@ -51,7 +51,17 @@ namespace rFactor2StatsBuilder
         }
 
         var hdvEntryStr = $"{hdvEntry.HdvID},{hdvEntry.Version},{hdvEntry.StopGo},{hdvEntry.StopGoSimultaneous},{hdvEntry.Preparation},{hdvEntry.DRSCapable},{hdvEntry.VehicleWidth},{hdvEntry.BrakeResponseCurveFrontLeft},{hdvEntry.BrakeResponseCurveFrontRight},{hdvEntry.BrakeResponseCurveRearLeft},{hdvEntry.BrakeResponseCurveRearRight},{hdvEntry.TbcIDPrefix}";
-        Utils.WriteLine($"VEH entry matched: \"{hdvEntryStr}\"", ConsoleColor.Magenta);
+        Utils.WriteLine($"HDV entry matched: \"{hdvEntryStr}\"", ConsoleColor.Magenta);
+
+        string tbcFileFull = null;
+        var tbcEntries = StatsBuilder.ProcessTbcFile(hdvEntry.TireBrand, vehDirFull, vehDir, hdvEntry.TbcIDPrefix, vehFileFull, out tbcFileFull);
+        //if (tbcEntries == null || string.IsNullOrWhiteSpace(tbcEntries.TireBrand))
+        //{
+//          Utils.WriteLine($"Error: failed to process hdv file {hdvFileFull ?? ""} for vehicle {vehFileFull}.", ConsoleColor.Red);
+  //        continue;
+    //    }
+
+
       }
     }
 
@@ -190,6 +200,7 @@ namespace rFactor2StatsBuilder
           break;
         }
 
+        // TODO: tireBrand might depend on upgrade selected.
         string tireBrand = null;
         if (!StatsBuilder.GetSectionValue(hdvFileFull, section, "TireBrand", out tireBrand, false /*optional*/))
           break;
@@ -344,6 +355,27 @@ namespace rFactor2StatsBuilder
       return hdvEntry;
     }
 
+    private static TbcEntry[] ProcessTbcFile(string tireBrand, string vehDirFull, string vehDir, string tbcIDPrefix, string vehFileFull, out string tbcFileFull)
+    {
+      tbcFileFull = null;
+      var tbcFile = tireBrand + ".tbc";
+      var tbcFiles = Directory.GetFiles(vehDirFull, tbcFile, SearchOption.AllDirectories);
+      if (tbcFiles == null || tbcFiles.Length == 0)
+      {
+        Utils.WriteLine($"Error: failed to locate {tbcFile} for vehicle {vehFileFull}.", ConsoleColor.Red);
+        return null;
+      }
+      else if (tbcFiles.Length > 1)
+        Utils.WriteLine($"Warning: tbc file {tbcFile} is ambigous for vehicle {vehFileFull}.  Will use the first one: {tbcFiles[0]}. ", ConsoleColor.Yellow);
+
+      tbcFileFull = tbcFiles[0];
+      //HdvEntry hdvEntry = null;
+      //if (StatsBuilder.hdvResolvedMap.TryGetValue(hdvFileFull, out hdvEntry))
+      //return null;
+
+      return null;
+    }
+
     private static bool RemoveParens(string preparation, out string preparationOut)
     {
       if (!string.IsNullOrWhiteSpace(preparation) && preparation.StartsWith("(") && preparation.EndsWith(")"))
@@ -357,7 +389,7 @@ namespace rFactor2StatsBuilder
 
     private static bool GetSectionValue(string vehFileFull, Dictionary<string, string> section, string key, out string value, bool optional)
     {
-      if (!section.TryGetValue(key, out value))
+      if (!section.TryGetValue(key.ToUpperInvariant(), out value))
       {
         if (!optional)
           Utils.WriteLine($"Error: '{key}' key value not found in file {vehFileFull}.", ConsoleColor.Red);

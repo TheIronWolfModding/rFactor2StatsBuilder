@@ -37,4 +37,23 @@ namespace rFactor2StatsBuilder
     // Internal (not part of entries).
     internal string TireBrand { get; set; }
   }
+
+  internal class TbcEntry
+  {
+    internal string TbcID { get; set; }
+    internal string Version { get; set; }
+    internal string FrontTgmID { get; set; }
+    internal string RearTgmID { get; set; }
+
+    // Internal (not part of entries).
+    internal string FrontTGM { get; set; }
+    internal string RearTGM { get; set; }
+  }
+
+  internal class TgmEntry
+  {
+    internal string TgmID { get; set; }
+    internal string Version { get; set; }
+    internal string StaticCurve { get; set; }
+  }
 }

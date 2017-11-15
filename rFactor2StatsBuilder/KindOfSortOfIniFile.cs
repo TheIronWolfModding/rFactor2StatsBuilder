@@ -54,7 +54,7 @@ namespace rFactor2StatsBuilder
 
           // Ok, this is new section.  Create a new section:
           currentSection = new Dictionary<string, string>();
-          this.sectionsToKeysToValuesMap.Add(sectionName, currentSection);
+          this.sectionsToKeysToValuesMap.Add(sectionName.ToUpperInvariant(), currentSection);
 
           continue;
         }
@@ -80,14 +80,14 @@ namespace rFactor2StatsBuilder
           }
 
           var keyTrimmed = keyValue[0].Trim();
-          if (currentSection.ContainsKey(keyTrimmed))
+          if (currentSection.ContainsKey(keyTrimmed.ToUpperInvariant()))
           {
             this.ReportWarning($"already encountered \"{keyTrimmed}\"", fileFull, lineCounter);
             continue;
           }
 
           var valueTrimmed = keyValue[1];
-          currentSection.Add(keyTrimmed, valueTrimmed);
+          currentSection.Add(keyTrimmed.ToUpperInvariant(), valueTrimmed);
           continue;
         }
       }
