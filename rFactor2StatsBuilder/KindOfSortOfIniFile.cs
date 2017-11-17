@@ -15,8 +15,7 @@ namespace rFactor2StatsBuilder
 {
   class KindOfSortOfIniFile
   {
-    internal Dictionary<string, Dictionary<string, string>> sectionsToKeysToValuesMap = new Dictionary<string, Dictionary<string, string>>();
-    internal int numErrors = 0;
+    internal Dictionary<string, List<Dictionary<string, string>>> sectionsToKeysToValuesMap = new Dictionary<string, List<Dictionary<string, string>>>();
 
     internal KindOfSortOfIniFile(string fileFull)
     {
@@ -24,9 +23,11 @@ namespace rFactor2StatsBuilder
       var lineCounter = 0;
 
       var currentSection = new Dictionary<string, string>();
+      var currentSectionList = new List<Dictionary<string, string>>();
+      currentSectionList.Add(currentSection);
 
       // Unnamed section.
-      this.sectionsToKeysToValuesMap.Add("", currentSection);
+      this.sectionsToKeysToValuesMap.Add("", currentSectionList);
 
       foreach (var line in lines)
       {
@@ -54,7 +55,20 @@ namespace rFactor2StatsBuilder
 
           // Ok, this is new section.  Create a new section:
           currentSection = new Dictionary<string, string>();
-          this.sectionsToKeysToValuesMap.Add(sectionName.ToUpperInvariant(), currentSection);
+          var sectionNameUpper = sectionName.ToUpperInvariant();
+
+          // Some sections may appear multiple times (COMPOUND).  So keep a list.
+          if (this.sectionsToKeysToValuesMap.ContainsKey(sectionNameUpper))
+            currentSectionList = this.sectionsToKeysToValuesMap[sectionNameUpper];
+          else
+          {
+            // New unique section.
+            currentSectionList = new List<Dictionary<string, string>>();
+            this.sectionsToKeysToValuesMap.Add(sectionNameUpper, currentSectionList);
+          }
+
+          // Add new section instance to the new or existing list.
+          currentSectionList.Add(currentSection);
 
           continue;
         }
@@ -104,13 +118,12 @@ namespace rFactor2StatsBuilder
 
     private void ReportError(string msg, string fileFull, int line)
     {
-      Utils.WriteLine($"Error: {msg}.  File: {fileFull} Line: {line}", ConsoleColor.Red);
-      ++this.numErrors;
+      Utils.ReportError($"{msg}.  File: {fileFull} Line: {line}");
     }
 
     private void ReportWarning(string msg, string fileFull, int line)
     {
-      Utils.WriteLine($"Warning: {msg}.  File: {fileFull} Line: {line}", ConsoleColor.Yellow);
+      Utils.ReportWarning($"{msg}.  File: {fileFull} Line: {line}");
     }
 
   }

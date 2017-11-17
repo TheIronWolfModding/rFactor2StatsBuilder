@@ -35,7 +35,7 @@ namespace rFactor2StatsBuilder
         var vehEntry = StatsBuilder.ProcessVehFile(vehFileFull, vehDir, out hdvFile);
         if (vehEntry == null || string.IsNullOrWhiteSpace(hdvFile))
         {
-          Utils.WriteLine($"Error: failed to process vehicle {vehFileFull}.", ConsoleColor.Red);
+          Utils.ReportError($"failed to process vehicle {vehFileFull}.");
           continue;
         }
 
@@ -46,7 +46,7 @@ namespace rFactor2StatsBuilder
         var hdvEntry = StatsBuilder.ProcessHdvFile(hdvFile, vehDirFull, vehDir, vehEntry.HdvID, vehFileFull, out hdvFileFull);
         if (hdvEntry == null || string.IsNullOrWhiteSpace(hdvEntry.TireBrand))
         {
-          Utils.WriteLine($"Error: failed to process hdv file {hdvFileFull ?? ""} for vehicle {vehFileFull}.", ConsoleColor.Red);
+          Utils.ReportError($"failed to process hdv file {hdvFileFull ?? ""} for vehicle {vehFileFull}.");
           continue;
         }
 
@@ -57,7 +57,7 @@ namespace rFactor2StatsBuilder
         var tbcEntries = StatsBuilder.ProcessTbcFile(hdvEntry.TireBrand, vehDirFull, vehDir, hdvEntry.TbcIDPrefix, vehFileFull, out tbcFileFull);
         //if (tbcEntries == null || string.IsNullOrWhiteSpace(tbcEntries.TireBrand))
         //{
-//          Utils.WriteLine($"Error: failed to process hdv file {hdvFileFull ?? ""} for vehicle {vehFileFull}.", ConsoleColor.Red);
+//          Utils.ReportError($"failed to process hdv file {hdvFileFull ?? ""} for vehicle {vehFileFull}.", ConsoleColor.Red);
   //        continue;
     //    }
 
@@ -73,12 +73,16 @@ namespace rFactor2StatsBuilder
 
       var vehFileReader = new KindOfSortOfIniFile(vehFileFull);
 
-      Dictionary<string, string> section;
-      if (!vehFileReader.sectionsToKeysToValuesMap.TryGetValue("", out section))
+      Dictionary<string, string> section = null;
+      List<Dictionary<string, string>> sectionList = null;
+      if (!vehFileReader.sectionsToKeysToValuesMap.TryGetValue("", out sectionList))
       {
-        Utils.WriteLine($"Error: global section not found in file {vehFileFull}.", ConsoleColor.Red);
+        Utils.ReportError($"global section not found in file {vehFileFull}.");
         return null;
       }
+
+      // Pick the first section.
+      section = sectionList[0];
 
       string descr;
       if (!StatsBuilder.GetSectionValue(vehFileFull, section, "Description", out descr, false /*optional*/))
@@ -91,14 +95,14 @@ namespace rFactor2StatsBuilder
       var catExtracted = StatsBuilder.ExtractCategory(cat);
       if (string.IsNullOrWhiteSpace(catExtracted))
       {
-        Utils.WriteLine($"Error: Failed to parse categroy out of {cat} in {vehFileFull}.", ConsoleColor.Red);
+        Utils.ReportError($"Failed to parse categroy out of {cat} in {vehFileFull}.");
         return null;
       }
 
       var descrExtracted = StatsBuilder.UnquoteString(descr);
       if (string.IsNullOrWhiteSpace(descrExtracted))
       {
-        Utils.WriteLine($"Error: Failed to parse description out of {descr} in {vehFileFull}.", ConsoleColor.Red);
+        Utils.ReportError($"Failed to parse description out of {descr} in {vehFileFull}.");
         return null;
       }
 
@@ -113,7 +117,7 @@ namespace rFactor2StatsBuilder
 
       if (string.IsNullOrWhiteSpace(hdvFile))
       {
-        Utils.WriteLine($"Error: Failed to parse .hdv file name out of {hdvFileFull} in {vehFileFull}.", ConsoleColor.Red);
+        Utils.ReportError($"Failed to parse .hdv file name out of {hdvFileFull} in {vehFileFull}.");
         return null;
       }
 
@@ -137,11 +141,11 @@ namespace rFactor2StatsBuilder
       var hdvFiles = Directory.GetFiles(vehDirFull, hdvFile, SearchOption.AllDirectories);
       if (hdvFiles == null || hdvFiles.Length == 0)
       {
-        Utils.WriteLine($"Error: failed to locate {hdvFile} for vehicle {vehFileFull}.", ConsoleColor.Red);
+        Utils.ReportError($"failed to locate {hdvFile} for vehicle {vehFileFull}.");
         return null;
       }
       else if (hdvFiles.Length > 1)
-        Utils.WriteLine($"Warning: hdv file {hdvFile} is ambigous for vehicle {vehFileFull}.  Will use the first one: {hdvFiles[0]}. ", ConsoleColor.Yellow);
+        Utils.ReportWarning($"hdv file {hdvFile} is ambigous for vehicle {vehFileFull}.  Will use the first one: {hdvFiles[0]}.");
 
       hdvFileFull = hdvFiles[0];
       HdvEntry hdvEntry = null;
@@ -193,12 +197,16 @@ namespace rFactor2StatsBuilder
         //////////////////////////////////////////
         // [GENERAL] section.
         //////////////////////////////////////////
-        Dictionary<string, string> section;
-        if (!hdvFileReader.sectionsToKeysToValuesMap.TryGetValue("GENERAL", out section))
+        Dictionary<string, string> section = null;
+        List<Dictionary<string, string>> sectionList = null;
+        if (!hdvFileReader.sectionsToKeysToValuesMap.TryGetValue("GENERAL", out sectionList))
         {
-          Utils.WriteLine($"Error: [GENERAL] section not found in file {hdvFileFull}.", ConsoleColor.Red);
+          Utils.ReportError($"[GENERAL] section not found in file {hdvFileFull}.");
           break;
         }
+
+        // Pick the first section.
+        section = sectionList[0];
 
         // TODO: tireBrand might depend on upgrade selected.
         string tireBrand = null;
@@ -214,11 +222,14 @@ namespace rFactor2StatsBuilder
         //////////////////////////////////////////
         // [PITMENU] section.
         //////////////////////////////////////////
-        if (!hdvFileReader.sectionsToKeysToValuesMap.TryGetValue("PITMENU", out section))
+        if (!hdvFileReader.sectionsToKeysToValuesMap.TryGetValue("PITMENU", out sectionList))
         {
-          Utils.WriteLine($"Error: [PITMENU] section not found in file {hdvFileFull}.", ConsoleColor.Red);
+          Utils.ReportError($"[PITMENU] section not found in file {hdvFileFull}.");
           break;
         }
+
+        // Pick the first section.
+        section = sectionList[0];
 
         var stopGo = "1";
         StatsBuilder.GetSectionValue(hdvFileFull, section, "StopGo", out stopGo, true /*optional*/);
@@ -236,11 +247,14 @@ namespace rFactor2StatsBuilder
         //////////////////////////////////////////
         // [REARWING] section.
         //////////////////////////////////////////
-        if (!hdvFileReader.sectionsToKeysToValuesMap.TryGetValue("REARWING", out section))
+        if (!hdvFileReader.sectionsToKeysToValuesMap.TryGetValue("REARWING", out sectionList))
         {
-          Utils.WriteLine($"Error: [REARWING] section not found in file {hdvFileFull}.", ConsoleColor.Red);
+          Utils.ReportError($"[REARWING] section not found in file {hdvFileFull}.");
           break;
         }
+
+        // Pick the first section.
+        section = sectionList[0];
 
         string DRSCapable = null;
         if (StatsBuilder.GetSectionValue(hdvFileFull, section, "FlapDrag", out DRSCapable, true /*optional*/)
@@ -254,11 +268,14 @@ namespace rFactor2StatsBuilder
         //////////////////////////////////////////
         // [BODYAERO] section.
         //////////////////////////////////////////
-        if (!hdvFileReader.sectionsToKeysToValuesMap.TryGetValue("BODYAERO", out section))
+        if (!hdvFileReader.sectionsToKeysToValuesMap.TryGetValue("BODYAERO", out sectionList))
         {
-          Utils.WriteLine($"Error: [BODYAERO] section not found in file {hdvFileFull}.", ConsoleColor.Red);
+          Utils.ReportError($"[BODYAERO] section not found in file {hdvFileFull}.");
           break;
         }
+
+        // Pick the first section.
+        section = sectionList[0];
 
         // TODO:  Probably drop this as it isn't critical and kills TCR mod.
         string vehicleWidth = null;
@@ -268,11 +285,14 @@ namespace rFactor2StatsBuilder
         //////////////////////////////////////////
         // [FRONTLEFT] section.
         //////////////////////////////////////////
-        if (!hdvFileReader.sectionsToKeysToValuesMap.TryGetValue("FRONTLEFT", out section))
+        if (!hdvFileReader.sectionsToKeysToValuesMap.TryGetValue("FRONTLEFT", out sectionList))
         {
-          Utils.WriteLine($"Error: [FRONTLEFT] section not found in file {hdvFileFull}.", ConsoleColor.Red);
+          Utils.ReportError($"[FRONTLEFT] section not found in file {hdvFileFull}.");
           break;
         }
+
+        // Pick the first section.
+        section = sectionList[0];
 
         string frontLeftBrakeCurve = null;
         if (!StatsBuilder.GetSectionValue(hdvFileFull, section, "BrakeResponseCurve", out frontLeftBrakeCurve, false /*optional*/))
@@ -284,11 +304,14 @@ namespace rFactor2StatsBuilder
         //////////////////////////////////////////
         // [FRONTRIGHT] section.
         //////////////////////////////////////////
-        if (!hdvFileReader.sectionsToKeysToValuesMap.TryGetValue("FRONTRIGHT", out section))
+        if (!hdvFileReader.sectionsToKeysToValuesMap.TryGetValue("FRONTRIGHT", out sectionList))
         {
-          Utils.WriteLine($"Error: [FRONTRIGHT] section not found in file {hdvFileFull}.", ConsoleColor.Red);
+          Utils.ReportError($"[FRONTRIGHT] section not found in file {hdvFileFull}.");
           break;
         }
+
+        // Pick the first section.
+        section = sectionList[0];
 
         string frontRightBrakeCurve = null;
         if (!StatsBuilder.GetSectionValue(hdvFileFull, section, "BrakeResponseCurve", out frontRightBrakeCurve, false /*optional*/))
@@ -300,11 +323,14 @@ namespace rFactor2StatsBuilder
         //////////////////////////////////////////
         // [REARLEFT] section.
         //////////////////////////////////////////
-        if (!hdvFileReader.sectionsToKeysToValuesMap.TryGetValue("REARLEFT", out section))
+        if (!hdvFileReader.sectionsToKeysToValuesMap.TryGetValue("REARLEFT", out sectionList))
         {
-          Utils.WriteLine($"Error: [REARLEFT] section not found in file {hdvFileFull}.", ConsoleColor.Red);
+          Utils.ReportError($"[REARLEFT] section not found in file {hdvFileFull}.");
           break;
         }
+
+        // Pick the first section.
+        section = sectionList[0];
 
         string rearLeftBrakeCurve = null;
         if (!StatsBuilder.GetSectionValue(hdvFileFull, section, "BrakeResponseCurve", out rearLeftBrakeCurve, false /*optional*/))
@@ -316,11 +342,14 @@ namespace rFactor2StatsBuilder
         //////////////////////////////////////////
         // [REARRIGHT] section.
         //////////////////////////////////////////
-        if (!hdvFileReader.sectionsToKeysToValuesMap.TryGetValue("REARRIGHT", out section))
+        if (!hdvFileReader.sectionsToKeysToValuesMap.TryGetValue("REARRIGHT", out sectionList))
         {
-          Utils.WriteLine($"Error: [REARRIGHT] section not found in file {hdvFileFull}.", ConsoleColor.Red);
+          Utils.ReportError($"[REARRIGHT] section not found in file {hdvFileFull}.");
           break;
         }
+
+        // Pick the first section.
+        section = sectionList[0];
 
         string rearRightBrakeCurve = null;
         if (!StatsBuilder.GetSectionValue(hdvFileFull, section, "BrakeResponseCurve", out rearRightBrakeCurve, false /*optional*/))
@@ -362,11 +391,11 @@ namespace rFactor2StatsBuilder
       var tbcFiles = Directory.GetFiles(vehDirFull, tbcFile, SearchOption.AllDirectories);
       if (tbcFiles == null || tbcFiles.Length == 0)
       {
-        Utils.WriteLine($"Error: failed to locate {tbcFile} for vehicle {vehFileFull}.", ConsoleColor.Red);
+        Utils.ReportError($"failed to locate {tbcFile} for vehicle {vehFileFull}.");
         return null;
       }
       else if (tbcFiles.Length > 1)
-        Utils.WriteLine($"Warning: tbc file {tbcFile} is ambigous for vehicle {vehFileFull}.  Will use the first one: {tbcFiles[0]}. ", ConsoleColor.Yellow);
+        Utils.ReportWarning($"tbc file {tbcFile} is ambigous for vehicle {vehFileFull}.  Will use the first one: {tbcFiles[0]}.");
 
       tbcFileFull = tbcFiles[0];
       //HdvEntry hdvEntry = null;
@@ -392,7 +421,7 @@ namespace rFactor2StatsBuilder
       if (!section.TryGetValue(key.ToUpperInvariant(), out value))
       {
         if (!optional)
-          Utils.WriteLine($"Error: '{key}' key value not found in file {vehFileFull}.", ConsoleColor.Red);
+          Utils.ReportError($"'{key}' key value not found in file {vehFileFull}.");
 
         return false;
       }
