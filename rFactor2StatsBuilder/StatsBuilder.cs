@@ -50,6 +50,7 @@ namespace rFactor2StatsBuilder
           continue;
         }
 
+        // TODO: we could possibly allow entries without TBC/TGM.
         var hdvEntryStr = $"{hdvEntry.HdvID},{hdvEntry.Version},{hdvEntry.StopGo},{hdvEntry.StopGoSimultaneous},{hdvEntry.Preparation},{hdvEntry.DRSCapable},{hdvEntry.VehicleWidth},{hdvEntry.BrakeResponseCurveFrontLeft},{hdvEntry.BrakeResponseCurveFrontRight},{hdvEntry.BrakeResponseCurveRearLeft},{hdvEntry.BrakeResponseCurveRearRight},{hdvEntry.TbcIDPrefix}";
         Utils.WriteLine($"HDV entry matched: \"{hdvEntryStr}\"", ConsoleColor.Magenta);
 
@@ -73,8 +74,8 @@ namespace rFactor2StatsBuilder
 
       var vehFileReader = new KindOfSortOfIniFile(vehFileFull);
 
-      Dictionary<string, string> section = null;
-      List<Dictionary<string, string>> sectionList = null;
+      Dictionary<string, List<string>> section = null;
+      List<Dictionary<string, List<string>>> sectionList = null;
       if (!vehFileReader.sectionsToKeysToValuesMap.TryGetValue("", out sectionList))
       {
         Utils.ReportError($"global section not found in file {vehFileFull}.");
@@ -85,11 +86,11 @@ namespace rFactor2StatsBuilder
       section = sectionList[0];
 
       string descr;
-      if (!StatsBuilder.GetSectionValue(vehFileFull, section, "Description", out descr, false /*optional*/))
+      if (!StatsBuilder.GetFirstSectionValue(vehFileFull, section, "Description", out descr, false /*optional*/))
         return null;
 
       string cat;
-      if (!StatsBuilder.GetSectionValue(vehFileFull, section, "Category", out cat, false /*optional*/))
+      if (!StatsBuilder.GetFirstSectionValue(vehFileFull, section, "Category", out cat, false /*optional*/))
         return null;
 
       var catExtracted = StatsBuilder.ExtractCategory(cat);
@@ -107,7 +108,7 @@ namespace rFactor2StatsBuilder
       }
 
       string hdvFileFull;
-      if (!StatsBuilder.GetSectionValue(vehFileFull, section, "HDVehicle", out hdvFileFull, false /*optional*/))
+      if (!StatsBuilder.GetFirstSectionValue(vehFileFull, section, "HDVehicle", out hdvFileFull, false /*optional*/))
         return null;
 
       var lastSlash = hdvFileFull.LastIndexOf('\\');
@@ -197,8 +198,8 @@ namespace rFactor2StatsBuilder
         //////////////////////////////////////////
         // [GENERAL] section.
         //////////////////////////////////////////
-        Dictionary<string, string> section = null;
-        List<Dictionary<string, string>> sectionList = null;
+        Dictionary<string, List<string>> section = null;
+        List<Dictionary<string, List<string>>> sectionList = null;
         if (!hdvFileReader.sectionsToKeysToValuesMap.TryGetValue("GENERAL", out sectionList))
         {
           Utils.ReportError($"[GENERAL] section not found in file {hdvFileFull}.");
@@ -210,7 +211,7 @@ namespace rFactor2StatsBuilder
 
         // TODO: tireBrand might depend on upgrade selected.
         string tireBrand = null;
-        if (!StatsBuilder.GetSectionValue(hdvFileFull, section, "TireBrand", out tireBrand, false /*optional*/))
+        if (!StatsBuilder.GetFirstSectionValue(hdvFileFull, section, "TireBrand", out tireBrand, false /*optional*/))
           break;
 
         tireBrand = tireBrand.ToLowerInvariant();
@@ -232,13 +233,13 @@ namespace rFactor2StatsBuilder
         section = sectionList[0];
 
         var stopGo = "1";
-        StatsBuilder.GetSectionValue(hdvFileFull, section, "StopGo", out stopGo, true /*optional*/);
+        StatsBuilder.GetFirstSectionValue(hdvFileFull, section, "StopGo", out stopGo, true /*optional*/);
 
         var stopGoSimultaneous = "0";
-        StatsBuilder.GetSectionValue(hdvFileFull, section, "StopGoSimultaneous", out stopGoSimultaneous, true /*optional*/);
+        StatsBuilder.GetFirstSectionValue(hdvFileFull, section, "StopGoSimultaneous", out stopGoSimultaneous, true /*optional*/);
 
         string preparation = null;
-        if (!StatsBuilder.GetSectionValue(hdvFileFull, section, "Preparation", out preparation, false /*optional*/))
+        if (!StatsBuilder.GetFirstSectionValue(hdvFileFull, section, "Preparation", out preparation, false /*optional*/))
           break;
 
         if (!StatsBuilder.RemoveParens(preparation, out preparation))
@@ -257,10 +258,10 @@ namespace rFactor2StatsBuilder
         section = sectionList[0];
 
         string DRSCapable = null;
-        if (StatsBuilder.GetSectionValue(hdvFileFull, section, "FlapDrag", out DRSCapable, true /*optional*/)
-          && StatsBuilder.GetSectionValue(hdvFileFull, section, "FlapLift", out DRSCapable, true /*optional*/)
-          && StatsBuilder.GetSectionValue(hdvFileFull, section, "FlapTimes", out DRSCapable, true /*optional*/)
-          && StatsBuilder.GetSectionValue(hdvFileFull, section, "FlapRules", out DRSCapable, true /*optional*/))
+        if (StatsBuilder.GetFirstSectionValue(hdvFileFull, section, "FlapDrag", out DRSCapable, true /*optional*/)
+          && StatsBuilder.GetFirstSectionValue(hdvFileFull, section, "FlapLift", out DRSCapable, true /*optional*/)
+          && StatsBuilder.GetFirstSectionValue(hdvFileFull, section, "FlapTimes", out DRSCapable, true /*optional*/)
+          && StatsBuilder.GetFirstSectionValue(hdvFileFull, section, "FlapRules", out DRSCapable, true /*optional*/))
           DRSCapable = "1";
         else
           DRSCapable = "0";
@@ -277,10 +278,8 @@ namespace rFactor2StatsBuilder
         // Pick the first section.
         section = sectionList[0];
 
-        // TODO:  Probably drop this as it isn't critical and kills TCR mod.
-        string vehicleWidth = null;
-        if (!StatsBuilder.GetSectionValue(hdvFileFull, section, "VehicleWidth", out vehicleWidth, false /*optional*/))
-          break;
+        string vehicleWidth = "-1";
+        StatsBuilder.GetFirstSectionValue(hdvFileFull, section, "VehicleWidth", out vehicleWidth, true /*optional*/);
 
         //////////////////////////////////////////
         // [FRONTLEFT] section.
@@ -295,7 +294,7 @@ namespace rFactor2StatsBuilder
         section = sectionList[0];
 
         string frontLeftBrakeCurve = null;
-        if (!StatsBuilder.GetSectionValue(hdvFileFull, section, "BrakeResponseCurve", out frontLeftBrakeCurve, false /*optional*/))
+        if (!StatsBuilder.GetFirstSectionValue(hdvFileFull, section, "BrakeResponseCurve", out frontLeftBrakeCurve, false /*optional*/))
           break;
 
         if (!StatsBuilder.RemoveParens(frontLeftBrakeCurve, out frontLeftBrakeCurve))
@@ -314,7 +313,7 @@ namespace rFactor2StatsBuilder
         section = sectionList[0];
 
         string frontRightBrakeCurve = null;
-        if (!StatsBuilder.GetSectionValue(hdvFileFull, section, "BrakeResponseCurve", out frontRightBrakeCurve, false /*optional*/))
+        if (!StatsBuilder.GetFirstSectionValue(hdvFileFull, section, "BrakeResponseCurve", out frontRightBrakeCurve, false /*optional*/))
           break;
 
         if (!StatsBuilder.RemoveParens(frontRightBrakeCurve, out frontRightBrakeCurve))
@@ -333,7 +332,7 @@ namespace rFactor2StatsBuilder
         section = sectionList[0];
 
         string rearLeftBrakeCurve = null;
-        if (!StatsBuilder.GetSectionValue(hdvFileFull, section, "BrakeResponseCurve", out rearLeftBrakeCurve, false /*optional*/))
+        if (!StatsBuilder.GetFirstSectionValue(hdvFileFull, section, "BrakeResponseCurve", out rearLeftBrakeCurve, false /*optional*/))
           break;
 
         if (!StatsBuilder.RemoveParens(rearLeftBrakeCurve, out rearLeftBrakeCurve))
@@ -352,7 +351,7 @@ namespace rFactor2StatsBuilder
         section = sectionList[0];
 
         string rearRightBrakeCurve = null;
-        if (!StatsBuilder.GetSectionValue(hdvFileFull, section, "BrakeResponseCurve", out rearRightBrakeCurve, false /*optional*/))
+        if (!StatsBuilder.GetFirstSectionValue(hdvFileFull, section, "BrakeResponseCurve", out rearRightBrakeCurve, false /*optional*/))
           break;
 
         if (!StatsBuilder.RemoveParens(rearRightBrakeCurve, out rearRightBrakeCurve))
@@ -384,7 +383,9 @@ namespace rFactor2StatsBuilder
       return hdvEntry;
     }
 
-    private static TbcEntry[] ProcessTbcFile(string tireBrand, string vehDirFull, string vehDir, string tbcIDPrefix, string vehFileFull, out string tbcFileFull)
+    private static Dictionary<string, List<TbcEntry>> tbcResolvedMap = new Dictionary<string, List<TbcEntry>>();
+
+    private static List<TbcEntry> ProcessTbcFile(string tireBrand, string vehDirFull, string vehDir, string tbcIDPrefix, string vehFileFull, out string tbcFileFull)
     {
       tbcFileFull = null;
       var tbcFile = tireBrand + ".tbc";
@@ -398,11 +399,48 @@ namespace rFactor2StatsBuilder
         Utils.ReportWarning($"tbc file {tbcFile} is ambigous for vehicle {vehFileFull}.  Will use the first one: {tbcFiles[0]}.");
 
       tbcFileFull = tbcFiles[0];
-      //HdvEntry hdvEntry = null;
-      //if (StatsBuilder.hdvResolvedMap.TryGetValue(hdvFileFull, out hdvEntry))
-      //return null;
+      List<TbcEntry> tbcEntries = null;
+      if (StatsBuilder.tbcResolvedMap.TryGetValue(tbcFileFull, out tbcEntries))
+        return tbcEntries;
 
-      return null;
+      do
+      {
+        /*
+         * Extracted stuff:
+         * [COMPOUND]
+         * Name="Soft"
+         * WetWeather=1/0
+         * FRONT:
+         * TGM="tgm file name"
+         * REAR:
+         * TGM="tgm file name"
+         */
+        Utils.WriteLine($"\nProcessing .tbc: {tbcFileFull}", ConsoleColor.Cyan);
+
+        var tbcFileReader = new KindOfSortOfIniFile(tbcFileFull);
+
+        Dictionary<string, List<string>> section = null;
+        List<Dictionary<string, List<string>>> sectionList = null;
+        if (!tbcFileReader.sectionsToKeysToValuesMap.TryGetValue("COMPOUND", out sectionList))
+        {
+          Utils.ReportError($"[COMPOUND] section not found in file {tbcFileFull}.");
+          break;
+        }
+
+        foreach (var s in sectionList)
+        {
+          string compoundName = null;
+          if (!StatsBuilder.GetFirstSectionValue(tbcFileFull, s, "Name", out compoundName, false /*optional*/))
+            break;
+
+        //  Console.WriteLine(compoundName);
+        }
+
+      } while (false);
+
+      StatsBuilder.tbcResolvedMap.Add(tbcFileFull, tbcEntries);
+
+      return tbcEntries;
     }
 
     private static bool RemoveParens(string preparation, out string preparationOut)
@@ -416,15 +454,20 @@ namespace rFactor2StatsBuilder
       return false;
     }
 
-    private static bool GetSectionValue(string vehFileFull, Dictionary<string, string> section, string key, out string value, bool optional)
+    private static bool GetFirstSectionValue(string vehFileFull, Dictionary<string, List<string>> section, string key, out string value, bool optional)
     {
-      if (!section.TryGetValue(key.ToUpperInvariant(), out value))
+      List<string> thisKeyValues = null;
+      if (!section.TryGetValue(key.ToUpperInvariant(), out thisKeyValues))
       {
         if (!optional)
           Utils.ReportError($"'{key}' key value not found in file {vehFileFull}.");
 
+        value = null;
         return false;
       }
+
+      Debug.Assert(thisKeyValues.Count > 0);
+      value = thisKeyValues[0];
 
       return true;
     }

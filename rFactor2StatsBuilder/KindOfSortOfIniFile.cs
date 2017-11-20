@@ -15,15 +15,18 @@ namespace rFactor2StatsBuilder
 {
   class KindOfSortOfIniFile
   {
-    internal Dictionary<string, List<Dictionary<string, string>>> sectionsToKeysToValuesMap = new Dictionary<string, List<Dictionary<string, string>>>();
+    // Maps section name to multiple section key-value maps.  Keys can be duplicated, so values are a list too.
+    //                  section name -> section -> key -> values.
+    internal Dictionary<string, List<Dictionary<string, List<string>>>> sectionsToKeysToValuesMap = new Dictionary<string, List<Dictionary<string, List<string>>>>();
+    internal string currentSectionNameUpper = null;
 
     internal KindOfSortOfIniFile(string fileFull)
     {
       var lines = File.ReadAllLines(fileFull);
       var lineCounter = 0;
 
-      var currentSection = new Dictionary<string, string>();
-      var currentSectionList = new List<Dictionary<string, string>>();
+      var currentSection = new Dictionary<string, List<string>>();
+      var currentSectionList = new List<Dictionary<string, List<string>>>();
       currentSectionList.Add(currentSection);
 
       // Unnamed section.
@@ -54,17 +57,17 @@ namespace rFactor2StatsBuilder
           var sectionName = l.Substring(1, closingBkgIdx - 1);
 
           // Ok, this is new section.  Create a new section:
-          currentSection = new Dictionary<string, string>();
-          var sectionNameUpper = sectionName.ToUpperInvariant();
+          currentSection = new Dictionary<string, List<string>>();
+          this.currentSectionNameUpper = sectionName.ToUpperInvariant();
 
           // Some sections may appear multiple times (COMPOUND).  So keep a list.
-          if (this.sectionsToKeysToValuesMap.ContainsKey(sectionNameUpper))
-            currentSectionList = this.sectionsToKeysToValuesMap[sectionNameUpper];
+          if (this.sectionsToKeysToValuesMap.ContainsKey(currentSectionNameUpper))
+            currentSectionList = this.sectionsToKeysToValuesMap[currentSectionNameUpper];
           else
           {
             // New unique section.
-            currentSectionList = new List<Dictionary<string, string>>();
-            this.sectionsToKeysToValuesMap.Add(sectionNameUpper, currentSectionList);
+            currentSectionList = new List<Dictionary<string, List<string>>>();
+            this.sectionsToKeysToValuesMap.Add(currentSectionNameUpper, currentSectionList);
           }
 
           // Add new section instance to the new or existing list.
@@ -74,7 +77,13 @@ namespace rFactor2StatsBuilder
         }
         else  // Key=value.
         {
+          if (this.currentSectionNameUpper == "SLIPCURVE")
+            continue;
+
           l = this.SanitizeKeyValuePair(l);
+          if (l == "FRONT:" || l == "REAR:")
+            continue;
+
           if (!l.Contains("="))
           {
             this.ReportWarning($"ignoring unrecognized key value pair statement \"{l}\".", fileFull, lineCounter);
@@ -94,14 +103,17 @@ namespace rFactor2StatsBuilder
           }
 
           var keyTrimmed = keyValue[0].Trim();
-          if (currentSection.ContainsKey(keyTrimmed.ToUpperInvariant()))
+          var keyUpper = keyTrimmed.ToUpperInvariant();
+          var valueTrimmed = keyValue[1];
+          List<string> thisKeyValues = null;
+          if (!currentSection.TryGetValue(keyUpper, out thisKeyValues))
           {
-            this.ReportWarning($"already encountered \"{keyTrimmed}\"", fileFull, lineCounter);
-            continue;
+            thisKeyValues = new List<string>();
+            currentSection.Add(keyUpper, thisKeyValues);
           }
 
-          var valueTrimmed = keyValue[1];
-          currentSection.Add(keyTrimmed.ToUpperInvariant(), valueTrimmed);
+          thisKeyValues.Add(valueTrimmed);
+
           continue;
         }
       }
