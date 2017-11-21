@@ -46,7 +46,7 @@ namespace rFactor2StatsBuilder
         var hdvEntry = StatsBuilder.ProcessHdvFile(hdvFile, vehDirFull, vehDir, vehEntry.HdvID, vehFileFull, out hdvFileFull);
         if (hdvEntry == null || string.IsNullOrWhiteSpace(hdvEntry.TireBrand))
         {
-          Utils.ReportError($"failed to process hdv file {hdvFileFull ?? ""} for vehicle {vehFileFull}.");
+          Utils.ReportError($"failed to process .hdv file {hdvFileFull ?? ""} for vehicle {vehFileFull}.");
           continue;
         }
 
@@ -56,11 +56,23 @@ namespace rFactor2StatsBuilder
 
         string tbcFileFull = null;
         var tbcEntries = StatsBuilder.ProcessTbcFile(hdvEntry.TireBrand, vehDirFull, vehDir, hdvEntry.TbcIDPrefix, vehFileFull, out tbcFileFull);
+        if (tbcEntries == null || tbcEntries.Count == 0)
+        {
+          Utils.ReportError($"failed to process .tbc file {tbcFileFull ?? ""} for vehicle {vehFileFull}.");
+          continue;
+        }
+
+        foreach (var e in tbcEntries)
+        {
+          var tbcEntryStr = $"{e.TbcID},{e.Version},{e.WetWeather},{e.FrontTgmID},{e.RearTgmID}";
+          Utils.WriteLine($"TBC entry matched: \"{tbcEntryStr}\"", ConsoleColor.Magenta);
+        }
+
         //if (tbcEntries == null || string.IsNullOrWhiteSpace(tbcEntries.TireBrand))
         //{
-//          Utils.ReportError($"failed to process hdv file {hdvFileFull ?? ""} for vehicle {vehFileFull}.", ConsoleColor.Red);
-  //        continue;
-    //    }
+        //          Utils.ReportError($"failed to process hdv file {hdvFileFull ?? ""} for vehicle {vehFileFull}.", ConsoleColor.Red);
+        //        continue;
+        //    }
 
 
       }
@@ -74,8 +86,8 @@ namespace rFactor2StatsBuilder
 
       var vehFileReader = new KindOfSortOfIniFile(vehFileFull);
 
-      Dictionary<string, List<string>> section = null;
-      List<Dictionary<string, List<string>>> sectionList = null;
+      Dictionary<string, List<KindOfSortOfIniFile.ValueInSubSection>> section = null;
+      List<Dictionary<string, List<KindOfSortOfIniFile.ValueInSubSection>>> sectionList = null;
       if (!vehFileReader.sectionsToKeysToValuesMap.TryGetValue("", out sectionList))
       {
         Utils.ReportError($"global section not found in file {vehFileFull}.");
@@ -198,8 +210,8 @@ namespace rFactor2StatsBuilder
         //////////////////////////////////////////
         // [GENERAL] section.
         //////////////////////////////////////////
-        Dictionary<string, List<string>> section = null;
-        List<Dictionary<string, List<string>>> sectionList = null;
+        Dictionary<string, List<KindOfSortOfIniFile.ValueInSubSection>> section = null;
+        List<Dictionary<string, List<KindOfSortOfIniFile.ValueInSubSection>>> sectionList = null;
         if (!hdvFileReader.sectionsToKeysToValuesMap.TryGetValue("GENERAL", out sectionList))
         {
           Utils.ReportError($"[GENERAL] section not found in file {hdvFileFull}.");
@@ -400,9 +412,11 @@ namespace rFactor2StatsBuilder
 
       tbcFileFull = tbcFiles[0];
       List<TbcEntry> tbcEntries = null;
+      List<TbcEntry> tbcEntriesIntermediate = null;
       if (StatsBuilder.tbcResolvedMap.TryGetValue(tbcFileFull, out tbcEntries))
         return tbcEntries;
 
+      bool failed = false;
       do
       {
         /*
@@ -410,33 +424,103 @@ namespace rFactor2StatsBuilder
          * [COMPOUND]
          * Name="Soft"
          * WetWeather=1/0
-         * FRONT:
+         * FRONT: (subsection)
          * TGM="tgm file name"
-         * REAR:
+         * REAR: (subsection)
          * TGM="tgm file name"
          */
         Utils.WriteLine($"\nProcessing .tbc: {tbcFileFull}", ConsoleColor.Cyan);
 
         var tbcFileReader = new KindOfSortOfIniFile(tbcFileFull);
 
-        Dictionary<string, List<string>> section = null;
-        List<Dictionary<string, List<string>>> sectionList = null;
+        //Dictionary<string, List<KindOfSortOfIniFile.ValueInSubSection>> section = null;
+        List<Dictionary<string, List<KindOfSortOfIniFile.ValueInSubSection>>> sectionList = null;
         if (!tbcFileReader.sectionsToKeysToValuesMap.TryGetValue("COMPOUND", out sectionList))
         {
           Utils.ReportError($"[COMPOUND] section not found in file {tbcFileFull}.");
           break;
         }
 
+        var ver = new DirectoryInfo(tbcFileFull).Parent.Name;
+        tbcEntriesIntermediate = new List<TbcEntry>();
         foreach (var s in sectionList)
         {
           string compoundName = null;
           if (!StatsBuilder.GetFirstSectionValue(tbcFileFull, s, "Name", out compoundName, false /*optional*/))
+          {
+            failed = true;
             break;
+          }
 
-        //  Console.WriteLine(compoundName);
+          string isWetCompound = "0";  // Assume it is dry.
+          StatsBuilder.GetFirstSectionValue(tbcFileFull, s, "WetWeather", out isWetCompound, true /*optional*/);
+
+          List<KindOfSortOfIniFile.ValueInSubSection> values = null;
+          if (!StatsBuilder.GetSectionValues(tbcFileFull, s, "TGM", out values, false /*optional*/))
+          {
+            failed = true;
+            break;
+          }
+
+          if (values.Count != 2)
+          {
+            Utils.ReportError($"Unexpected number of TGM entires in {tbcFileFull}");
+            failed = true;
+            break;
+          }
+
+          string frontTgm = null;
+          string rearTgm = null;
+          foreach (var v in values)
+          {
+            if (v.SubSection == "FRONT:")
+            {
+              frontTgm = v.Value;
+              continue;
+            }
+            else if (v.SubSection == "REAR:")
+            {
+              rearTgm = v.Value;
+              continue;
+            }
+
+            failed = true;
+            break;
+          }
+
+          if (frontTgm == null || rearTgm == null)
+          {
+            Utils.ReportError($"Couldn't figure out Front/Rear TGM entires in {tbcFileFull}");
+            failed = true;
+            break;
+          }
+
+          // All collected.  Form an entry.
+          tbcEntriesIntermediate.Add(new TbcEntry()
+            {
+              TbcID = $"{tbcIDPrefix}@@{compoundName}".ToLowerInvariant(),
+              Version = ver,
+              WetWeather = isWetCompound,
+              FrontTgmID = $"tbc@@{vehDir}@@{frontTgm}@@".ToLowerInvariant(),
+              RearTgmID = $"tbc@@{vehDir}@@{rearTgm}@@".ToLowerInvariant(),
+
+              // Internal (not part of entries).
+              FrontTGM = frontTgm,
+              RearTGM = rearTgm 
+            }
+          );
         }
 
+        if (failed) break;
+
       } while (false);
+
+      // Only use created entries if all of them succeeded.
+      if (!failed)
+      {
+        Debug.Assert(tbcEntriesIntermediate != null);
+        tbcEntries = tbcEntriesIntermediate;
+      }
 
       StatsBuilder.tbcResolvedMap.Add(tbcFileFull, tbcEntries);
 
@@ -454,9 +538,9 @@ namespace rFactor2StatsBuilder
       return false;
     }
 
-    private static bool GetFirstSectionValue(string vehFileFull, Dictionary<string, List<string>> section, string key, out string value, bool optional)
+    private static bool GetFirstSectionValue(string vehFileFull, Dictionary<string, List<KindOfSortOfIniFile.ValueInSubSection>> section, string key, out string value, bool optional)
     {
-      List<string> thisKeyValues = null;
+      List<KindOfSortOfIniFile.ValueInSubSection> thisKeyValues = null;
       if (!section.TryGetValue(key.ToUpperInvariant(), out thisKeyValues))
       {
         if (!optional)
@@ -467,10 +551,24 @@ namespace rFactor2StatsBuilder
       }
 
       Debug.Assert(thisKeyValues.Count > 0);
-      value = thisKeyValues[0];
+      value = thisKeyValues[0].Value;
 
       return true;
     }
+
+    private static bool GetSectionValues(string vehFileFull, Dictionary<string, List<KindOfSortOfIniFile.ValueInSubSection>> section, string key, out List<KindOfSortOfIniFile.ValueInSubSection> values, bool optional)
+    {
+      if (!section.TryGetValue(key.ToUpperInvariant(), out values))
+      {
+        if (!optional)
+          Utils.ReportError($"'{key}' key values not found in file {vehFileFull}.");
+
+        return false;
+      }
+
+      return true;
+    }
+
     private static string UnquoteString(string str)
     {
       if (!str.StartsWith("\"") || !str.EndsWith("\"") || str.Length < 3)

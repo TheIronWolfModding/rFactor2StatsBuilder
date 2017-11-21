@@ -42,6 +42,7 @@ namespace rFactor2StatsBuilder
   {
     internal string TbcID { get; set; }
     internal string Version { get; set; }
+    internal string WetWeather { get; set; }
     internal string FrontTgmID { get; set; }
     internal string RearTgmID { get; set; }
 
