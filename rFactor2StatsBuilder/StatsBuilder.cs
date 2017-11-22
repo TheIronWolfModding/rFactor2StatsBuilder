@@ -50,7 +50,6 @@ namespace rFactor2StatsBuilder
           continue;
         }
 
-        // TODO: we could possibly allow entries without TBC/TGM.
         var hdvEntryStr = $"{hdvEntry.HdvID},{hdvEntry.Version},{hdvEntry.StopGo},{hdvEntry.StopGoSimultaneous},{hdvEntry.Preparation},{hdvEntry.DRSCapable},{hdvEntry.VehicleWidth},{hdvEntry.BrakeResponseCurveFrontLeft},{hdvEntry.BrakeResponseCurveFrontRight},{hdvEntry.BrakeResponseCurveRearLeft},{hdvEntry.BrakeResponseCurveRearRight},{hdvEntry.TbcIDPrefix}";
         Utils.WriteLine($"HDV entry matched: \"{hdvEntryStr}\"", ConsoleColor.Magenta);
 
@@ -62,11 +61,26 @@ namespace rFactor2StatsBuilder
           continue;
         }
 
+        bool failed = false;
         foreach (var e in tbcEntries)
         {
           var tbcEntryStr = $"{e.TbcID},{e.Version},{e.WetWeather},{e.FrontTgmID},{e.RearTgmID}";
           Utils.WriteLine($"TBC entry matched: \"{tbcEntryStr}\"", ConsoleColor.Magenta);
+
+          string tgmFileFull = null;
+          var tgmEntry = StatsBuilder.ProcessTgmFile(e.FrontTGM, vehDirFull, e.FrontTgmID, vehFileFull, out tgmFileFull);
+          if (tgmEntry == null)
+          {
+            Utils.ReportError($"failed to process .tgm file {tgmFileFull ?? ""} for vehicle {vehFileFull}.");
+            failed = true;
+            break;
+          }
+
+          var tgmEntryStr = $"{tgmEntry.TgmID},{tgmEntry.Version},{tgmEntry.StaticCurve}";
+          Utils.WriteLine($"TGM entry matched: \"{tgmEntryStr}\"", ConsoleColor.Magenta);
         }
+
+        if (failed) continue;
 
         //if (tbcEntries == null || string.IsNullOrWhiteSpace(tbcEntries.TireBrand))
         //{
@@ -229,7 +243,7 @@ namespace rFactor2StatsBuilder
         tireBrand = tireBrand.ToLowerInvariant();
 
         // Some mods add .tbc, chop it off.
-        if (tireBrand.EndsWith(".tbc"))
+        if (tireBrand.ToUpperInvariant().EndsWith(".TBC"))
           tireBrand = tireBrand.Substring(0, tireBrand.Length - 4);
 
         //////////////////////////////////////////
@@ -244,11 +258,11 @@ namespace rFactor2StatsBuilder
         // Pick the first section.
         section = sectionList[0];
 
-        var stopGo = "1";
-        StatsBuilder.GetFirstSectionValue(hdvFileFull, section, "StopGo", out stopGo, true /*optional*/);
+        string stopGo = null;
+        StatsBuilder.GetFirstSectionValue(hdvFileFull, section, "StopGo", out stopGo, true /*optional*/, "1" /*default*/);
 
-        var stopGoSimultaneous = "0";
-        StatsBuilder.GetFirstSectionValue(hdvFileFull, section, "StopGoSimultaneous", out stopGoSimultaneous, true /*optional*/);
+        string stopGoSimultaneous = null;
+        StatsBuilder.GetFirstSectionValue(hdvFileFull, section, "StopGoSimultaneous", out stopGoSimultaneous, true /*optional*/, "0" /*default*/);
 
         string preparation = null;
         if (!StatsBuilder.GetFirstSectionValue(hdvFileFull, section, "Preparation", out preparation, false /*optional*/))
@@ -290,8 +304,8 @@ namespace rFactor2StatsBuilder
         // Pick the first section.
         section = sectionList[0];
 
-        string vehicleWidth = "-1";
-        StatsBuilder.GetFirstSectionValue(hdvFileFull, section, "VehicleWidth", out vehicleWidth, true /*optional*/);
+        string vehicleWidth = null;
+        StatsBuilder.GetFirstSectionValue(hdvFileFull, section, "VehicleWidth", out vehicleWidth, true /*optional*/, "-1" /*defaultValue*/);
 
         //////////////////////////////////////////
         // [FRONTLEFT] section.
@@ -380,10 +394,10 @@ namespace rFactor2StatsBuilder
           Preparation = preparation,
           DRSCapable = DRSCapable,
           VehicleWidth = vehicleWidth,
-          BrakeResponseCurveFrontLeft = frontLeftBrakeCurve,
-          BrakeResponseCurveFrontRight = frontRightBrakeCurve,
-          BrakeResponseCurveRearLeft = rearLeftBrakeCurve,
-          BrakeResponseCurveRearRight = rearRightBrakeCurve,
+          BrakeResponseCurveFrontLeft = frontLeftBrakeCurve.Replace(" ", ""),
+          BrakeResponseCurveFrontRight = frontRightBrakeCurve.Replace(" ", ""),
+          BrakeResponseCurveRearLeft = rearLeftBrakeCurve.Replace(" ", ""),
+          BrakeResponseCurveRearRight = rearRightBrakeCurve.Replace(" ", ""),
           TbcIDPrefix = $"tbc@@{vehDir}@@{tireBrand}@@".ToLowerInvariant(),
           TireBrand = tireBrand
         };
@@ -452,8 +466,8 @@ namespace rFactor2StatsBuilder
             break;
           }
 
-          string isWetCompound = "0";  // Assume it is dry.
-          StatsBuilder.GetFirstSectionValue(tbcFileFull, s, "WetWeather", out isWetCompound, true /*optional*/);
+          string isWetCompound = null;
+          StatsBuilder.GetFirstSectionValue(tbcFileFull, s, "WetWeather", out isWetCompound, true /*optional*/, "0" /*defaultValue*/);
 
           List<KindOfSortOfIniFile.ValueInSubSection> values = null;
           if (!StatsBuilder.GetSectionValues(tbcFileFull, s, "TGM", out values, false /*optional*/))
@@ -473,14 +487,24 @@ namespace rFactor2StatsBuilder
           string rearTgm = null;
           foreach (var v in values)
           {
+            // Some mods add .tgm, chop it off.
+            var value = StatsBuilder.UnquoteString(v.Value);
+            if (value.ToUpperInvariant().EndsWith(".TGM"))
+              value = value.Substring(0, value.Length - 4);
+
             if (v.SubSection == "FRONT:")
             {
-              frontTgm = v.Value;
+              frontTgm = value;
               continue;
             }
             else if (v.SubSection == "REAR:")
             {
-              rearTgm = v.Value;
+              rearTgm = value;
+              continue;
+            }
+            else if (v.SubSection == "ALL:")
+            {
+              frontTgm = rearTgm = value;
               continue;
             }
 
@@ -501,8 +525,8 @@ namespace rFactor2StatsBuilder
               TbcID = $"{tbcIDPrefix}@@{compoundName}".ToLowerInvariant(),
               Version = ver,
               WetWeather = isWetCompound,
-              FrontTgmID = $"tbc@@{vehDir}@@{frontTgm}@@".ToLowerInvariant(),
-              RearTgmID = $"tbc@@{vehDir}@@{rearTgm}@@".ToLowerInvariant(),
+              FrontTgmID = $"tgm@@{vehDir}@@{frontTgm}@@".ToLowerInvariant(),
+              RearTgmID = $"tgm@@{vehDir}@@{rearTgm}@@".ToLowerInvariant(),
 
               // Internal (not part of entries).
               FrontTGM = frontTgm,
@@ -527,18 +551,83 @@ namespace rFactor2StatsBuilder
       return tbcEntries;
     }
 
-    private static bool RemoveParens(string preparation, out string preparationOut)
+    private static Dictionary<string, TgmEntry> tgmResolvedMap = new Dictionary<string, TgmEntry>();
+
+    private static TgmEntry ProcessTgmFile(string tgmFile, string vehDirFull, string tgmID, string vehFileFull, out string tgmFileFull)
     {
-      if (!string.IsNullOrWhiteSpace(preparation) && preparation.StartsWith("(") && preparation.EndsWith(")"))
+      tgmFileFull = null;
+      tgmFile = tgmFile + ".tgm";
+      var tgmFiles = Directory.GetFiles(vehDirFull, tgmFile, SearchOption.AllDirectories);
+      if (tgmFiles == null || tgmFiles.Length == 0)
       {
-        preparationOut = preparation.Substring(1, preparation.Length - 2);
+        Utils.ReportError($"failed to locate {tgmFile} for vehicle {vehFileFull}.");
+        return null;
+      }
+      else if (tgmFiles.Length > 1)
+        Utils.ReportWarning($".tgm file {tgmFile} is ambigous for vehicle {vehFileFull}.  Will use the first one: {tgmFiles[0]}.");
+
+      tgmFileFull = tgmFiles[0];
+      TgmEntry tgmEntry = null;
+      if (StatsBuilder.tgmResolvedMap.TryGetValue(tgmFileFull, out tgmEntry))
+        return tgmEntry;
+
+      do
+      {
+        /*
+         * Extracted stuff:
+         * [Realtime]
+         * StaticCurve=
+         */
+        Utils.WriteLine($"\nProcessing .tgm: {tgmFileFull}", ConsoleColor.Cyan);
+
+        var tgmFileReader = new KindOfSortOfIniFile(tgmFileFull);
+
+        List<Dictionary<string, List<KindOfSortOfIniFile.ValueInSubSection>>> sectionList = null;
+        if (!tgmFileReader.sectionsToKeysToValuesMap.TryGetValue("REALTIME", out sectionList))
+        {
+          Utils.ReportError($"[REALTIME] section not found in file {tgmFileFull}.");
+          break;
+        }
+
+        var section = sectionList[0];
+
+        var ver = new DirectoryInfo(tgmFileFull).Parent.Name;
+        string staticCurve = null;
+        if (!StatsBuilder.GetFirstSectionValue(tgmFileFull, section, "StaticCurve", out staticCurve, false /*optional*/))
+          break;
+
+        if (!StatsBuilder.RemoveParens(staticCurve, out staticCurve))
+        {
+          Utils.ReportError($"failed to remove parens on StaticCurve {staticCurve} file {tgmFileFull}");
+          break;
+        }
+
+        tgmEntry = new TgmEntry()
+        {
+          TgmID = tgmID,
+          Version = ver,
+          StaticCurve = staticCurve.Replace(" ", "")
+        };
+
+      } while (false);
+
+      StatsBuilder.tgmResolvedMap.Add(tgmFileFull, tgmEntry);
+
+      return tgmEntry;
+    }
+
+    private static bool RemoveParens(string str, out string strOut)
+    {
+      if (!string.IsNullOrWhiteSpace(str) && str.StartsWith("(") && str.EndsWith(")"))
+      {
+        strOut = str.Substring(1, str.Length - 2);
         return true;
       }
-      preparationOut = preparation;
+      strOut = str;
       return false;
     }
 
-    private static bool GetFirstSectionValue(string vehFileFull, Dictionary<string, List<KindOfSortOfIniFile.ValueInSubSection>> section, string key, out string value, bool optional)
+    private static bool GetFirstSectionValue(string vehFileFull, Dictionary<string, List<KindOfSortOfIniFile.ValueInSubSection>> section, string key, out string value, bool optional, string defaultValue = null)
     {
       List<KindOfSortOfIniFile.ValueInSubSection> thisKeyValues = null;
       if (!section.TryGetValue(key.ToUpperInvariant(), out thisKeyValues))
@@ -546,7 +635,7 @@ namespace rFactor2StatsBuilder
         if (!optional)
           Utils.ReportError($"'{key}' key value not found in file {vehFileFull}.");
 
-        value = null;
+        value = defaultValue;
         return false;
       }
 

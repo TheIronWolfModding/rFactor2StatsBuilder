@@ -84,7 +84,12 @@ namespace rFactor2StatsBuilder
         }
         else  // Key=value.
         {
-          if (currentSectionNameUpper == "SLIPCURVE")
+          if (currentSectionNameUpper == "SLIPCURVE"
+            // .tgm
+            || currentSectionNameUpper == "LOOKUPDATA"
+            || currentSectionNameUpper == "NODE"
+            || currentSectionNameUpper == "LOOKUPV2"
+            || currentSectionNameUpper == "PATCHV1")
             continue;
 
           l = this.SanitizeKeyValuePair(l);
@@ -96,7 +101,7 @@ namespace rFactor2StatsBuilder
 
           if (!l.Contains("="))
           {
-            this.ReportWarning($"ignoring unrecognized key value pair statement \"{l}\".", fileFull, lineCounter);
+            this.ReportWarning($"ignoring unrecognized key value pair statement in sectiom \"{currentSectionNameUpper}\" \"{l}\".", fileFull, lineCounter);
             continue;
           }
 
@@ -108,7 +113,7 @@ namespace rFactor2StatsBuilder
 
           if (keyValue.Length == 0 || keyValue.Length > 2)
           {
-            this.ReportWarning($"ignoring unrecognized key value pair statement \"{l}\".", fileFull, lineCounter);
+            this.ReportWarning($"ignoring unrecognized key value pair statement in sectiom \"{currentSectionNameUpper}\" \"{l}\".", fileFull, lineCounter);
             continue;
           }
 
