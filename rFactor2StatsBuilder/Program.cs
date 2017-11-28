@@ -24,7 +24,7 @@ namespace rFactor2StatsBuilder
 
     static void Main(string[] args)
     {
-      //SourceExtractor.Extract();
+    //  SourceExtractor.Extract();
       StatsBuilder.Build();
 
       Utils.WriteLine("Errors:", ConsoleColor.Red);

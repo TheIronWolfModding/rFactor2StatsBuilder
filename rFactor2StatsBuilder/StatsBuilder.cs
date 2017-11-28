@@ -16,6 +16,23 @@ namespace rFactor2StatsBuilder
 {
   static class StatsBuilder
   {
+    private const int VEH_ENTRY_PARTS = 3;
+    private const int HDV_ENTRY_PARTS = 27;
+    private const int TBC_ENTRY_PARTS = 5;
+    private const int TGM_ENTRY_PARTS = 8;
+
+    private static readonly string fileTimesTampString = DateTime.Now.ToString("yyyy-MM-dd_HH-mm-ss");
+    private static readonly string basePath = rFactor2StatsBuilder.OutRoot;
+    private static readonly string vehOutFileFull = $"{basePath}\\{fileTimesTampString}___rf2_veh_static.csv";
+    private static readonly string hdvOutFileFull = $"{basePath}\\{fileTimesTampString}___rf2_hdv_static.csv";
+    private static readonly string tbcOutFileFull = $"{basePath}\\{fileTimesTampString}___rf2_tbc_static.csv";
+    private static readonly string tgmOutFileFull = $"{basePath}\\{fileTimesTampString}___rf2_tgm_static.csv";
+
+    private static HashSet<string> vehEntries = new HashSet<string>();
+    private static HashSet<string> hdvEntries = new HashSet<string>();
+    private static HashSet<string> tbcEntries = new HashSet<string>();
+    private static HashSet<string> tgmEntries = new HashSet<string>();
+
     internal static void Build()
     {
       Utils.WriteLine($"\nBuilding stats from sources in: {rFactor2StatsBuilder.OutRoot}", ConsoleColor.Green);
@@ -24,6 +41,26 @@ namespace rFactor2StatsBuilder
         var vehDir = new DirectoryInfo(vehDirFull).Name;
         StatsBuilder.ProcessSingleVehicle(vehDirFull, vehDir);
       }
+
+      var hdr = "VehID,Version,HdvID\n";
+      Debug.Assert(hdr.Split(',').Length == StatsBuilder.VEH_ENTRY_PARTS);
+      File.AppendAllText(StatsBuilder.vehOutFileFull, hdr);
+      File.AppendAllLines(StatsBuilder.vehOutFileFull, StatsBuilder.vehEntries);
+
+      hdr = "HdvID,Version,StopGo,StopGoSimultaneous,Preparation[0],Preparation[1],Preparation[2],Preparation[3],DRSCapable,VehicleWidth,BrakeResponseCurveFrontLeft[0],BrakeResponseCurveFrontLeft[1],BrakeResponseCurveFrontLeft[2],BrakeResponseCurveFrontLeft[3],BrakeResponseCurveFrontRight[0],BrakeResponseCurveFrontRight[1],BrakeResponseCurveFrontRight[2],BrakeResponseCurveFrontRight[3],BrakeResponseCurveRearLeft[0],BrakeResponseCurveRearLeft[1],BrakeResponseCurveRearLeft[2],BrakeResponseCurveRearLeft[3],BrakeResponseCurveRearRight[0],BrakeResponseCurveRearRight[1],BrakeResponseCurveRearRight[2],BrakeResponseCurveRearRight[3],TbcIDPrefix\n";
+      Debug.Assert(hdr.Split(',').Length == StatsBuilder.HDV_ENTRY_PARTS);
+      File.AppendAllText(StatsBuilder.hdvOutFileFull, hdr);
+      File.AppendAllLines(StatsBuilder.hdvOutFileFull, StatsBuilder.hdvEntries);
+
+      hdr = "TbcID,Version,WetWeather,FrontTgmID,RearTgmID\n";
+      Debug.Assert(hdr.Split(',').Length == StatsBuilder.TBC_ENTRY_PARTS);
+      File.AppendAllText(StatsBuilder.tbcOutFileFull, hdr);
+      File.AppendAllLines(StatsBuilder.tbcOutFileFull, StatsBuilder.tbcEntries);
+
+      hdr = "TgmID,Version,StaticCurve[0],StaticCurve[1],StaticCurve[2],StaticCurve[3],StaticCurve[4],StaticCurve[5]\n";
+      Debug.Assert(hdr.Split(',').Length == StatsBuilder.TGM_ENTRY_PARTS);
+      File.AppendAllText(StatsBuilder.tgmOutFileFull, hdr);
+      File.AppendAllLines(StatsBuilder.tgmOutFileFull, StatsBuilder.tgmEntries);
     }
 
     private static void ProcessSingleVehicle(string vehDirFull, string vehDir)
@@ -61,11 +98,14 @@ namespace rFactor2StatsBuilder
           continue;
         }
 
+        var tbcEntriesIntermediate = new List<string>();
+        var tgmEntriesIntermediate = new List<string>();
         bool failed = false;
         foreach (var e in tbcEntries)
         {
           var tbcEntryStr = $"{e.TbcID},{e.Version},{e.WetWeather},{e.FrontTgmID},{e.RearTgmID}";
           Utils.WriteLine($"TBC entry matched: \"{tbcEntryStr}\"", ConsoleColor.Magenta);
+          tbcEntriesIntermediate.Add(tbcEntryStr);
 
           string tgmFileFull = null;
           var tgmEntry = StatsBuilder.ProcessTgmFile(e.FrontTGM, vehDirFull, e.FrontTgmID, vehFileFull, out tgmFileFull);
@@ -78,17 +118,59 @@ namespace rFactor2StatsBuilder
 
           var tgmEntryStr = $"{tgmEntry.TgmID},{tgmEntry.Version},{tgmEntry.StaticCurve}";
           Utils.WriteLine($"TGM entry matched: \"{tgmEntryStr}\"", ConsoleColor.Magenta);
+          tgmEntriesIntermediate.Add(tgmEntryStr);
         }
 
         if (failed) continue;
 
-        //if (tbcEntries == null || string.IsNullOrWhiteSpace(tbcEntries.TireBrand))
-        //{
-        //          Utils.ReportError($"failed to process hdv file {hdvFileFull ?? ""} for vehicle {vehFileFull}.", ConsoleColor.Red);
-        //        continue;
-        //    }
+        // Ok, vehicle is fully resolved.  Add entries:
+        if (StatsBuilder.vehEntries.Contains(vehEntryStr))
+        {
+          Debug.Assert(false); // investigate
+          Utils.ReportError($"already seen {vehEntryStr}");  // should be unique.
+        }
+        else
+        {
+          var parts = vehEntryStr.Split(',').Length;
+          if (parts != StatsBuilder.VEH_ENTRY_PARTS)
+            Utils.ReportError($"invalid .veh entry detected {vehEntryStr}");
 
+          StatsBuilder.vehEntries.Add(vehEntryStr);
+        }
 
+        // The rest of entries are reused between vehicles, so might not necessarily be unique (different veh resolves to same hdv for example).
+        if (!StatsBuilder.hdvEntries.Contains(hdvEntryStr))
+        {
+          var parts = hdvEntryStr.Split(',').Length;
+          if (parts != StatsBuilder.HDV_ENTRY_PARTS)
+            Utils.ReportError($"invalid .hdv entry detected {hdvEntryStr}");
+
+          StatsBuilder.hdvEntries.Add(hdvEntryStr);
+        }
+
+        foreach (var e in tbcEntriesIntermediate)
+        {
+          if (!StatsBuilder.tbcEntries.Contains(e))
+          {
+            var parts = e.Split(',').Length;
+            if (parts != StatsBuilder.TBC_ENTRY_PARTS)
+              Utils.ReportError($"invalid .tbc entry detected {e}");
+
+            StatsBuilder.tbcEntries.Add(e);
+          }
+        }
+
+        foreach (var e in tgmEntriesIntermediate)
+        {
+          if (!StatsBuilder.tgmEntries.Contains(e))
+          {
+            var parts = e.Split(',').Length;
+            if (parts != StatsBuilder.TGM_ENTRY_PARTS)
+              Utils.ReportError($"invalid .tgm entry detected {e}");
+
+            StatsBuilder.tgmEntries.Add(e);
+          }
+        }
       }
     }
 
@@ -522,11 +604,11 @@ namespace rFactor2StatsBuilder
           // All collected.  Form an entry.
           tbcEntriesIntermediate.Add(new TbcEntry()
             {
-              TbcID = $"{tbcIDPrefix}@@{compoundName}".ToLowerInvariant(),
+              TbcID = $"{tbcIDPrefix}{StatsBuilder.UnquoteString(compoundName)}".ToLowerInvariant(),
               Version = ver,
               WetWeather = isWetCompound,
-              FrontTgmID = $"tgm@@{vehDir}@@{frontTgm}@@".ToLowerInvariant(),
-              RearTgmID = $"tgm@@{vehDir}@@{rearTgm}@@".ToLowerInvariant(),
+              FrontTgmID = $"tgm@@{vehDir}@@{frontTgm}".ToLowerInvariant(),
+              RearTgmID = $"tgm@@{vehDir}@@{rearTgm}".ToLowerInvariant(),
 
               // Internal (not part of entries).
               FrontTGM = frontTgm,
